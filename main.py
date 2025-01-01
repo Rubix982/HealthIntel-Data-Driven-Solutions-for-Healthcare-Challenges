@@ -1,13 +1,20 @@
 import pandas
 import torch
 import torch.nn as nn
-from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.metrics import mean_absolute_error, classification_report
-from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
+import statsmodel.api as sm
+from scipy import stats
+from scipy.stats import chi2_contingency
+from statsmodel.formula.api import ols
+from statsmodel.stats.anova import AnovaRM
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.linear_model import Ridge
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, classification_report
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
 from typing import Union
 
 
@@ -322,6 +329,100 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
     plt.show()
 
 
+def quick_anova_analysis(dataframe: pandas.DataFrame):
+    # Get the unique diseases from the "Disease" column
+    unique_diseases = dataframe[Columns.DISEASE_DIAGNOSED].unique()
+
+    # Prepare the groups for ANOVA
+    groups = [
+        dataframe[dataframe[Columns.DISEASE_DIAGNOSED] == disease][
+            Columns.LENGTH_OF_STAY
+        ]
+        for disease in unique_diseases
+    ]
+
+    # Perform one-way ANOVA
+    f_stat, p_value = stats.f_oneway(*groups)
+
+    print("F-Statistic: ", f_stat)
+    print("P-Value:", p_value)
+
+
+def quick_two_way_anova_analysis(dataframe: pandas.DataFrame):
+    # Fit the model
+    model = ols(
+        "Length_of_Stay ~ C(Disease_Diagnosed) + C(Gender) + C(Disease_Diagnosed):C(Gender)",
+        data=dataframe,
+    ).fit()
+
+    # Perform Two-Way ANOVA
+    anova_results = sm.stats.anova_lm(model, type=2)
+    print(anova_results)
+
+
+def quick_chi_square_analysis(dataframe: pandas.DataFrame):
+    # Contingency table between Disease Diagnosed and Funding Type
+    contingency_table = pandas.crosstab(
+        dataframe[Columns.DISEASE_DIAGNOSED],
+        dataframe[Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF],
+    )
+
+    # Perform Chi-Square test
+    chi2, p, _, _ = chi2_contingency(contingency_table)
+
+    print(f"Chi-Square Statistics: {chi2}")
+    print(f"P-Value: {p}")
+
+
+def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
+    # Preprocessing
+    X = dataframe[["Age", "Gender", "Disease Diagnosed", "Hospital"]]
+    y = dataframe["Length_of_Stay"]
+
+    # Train/Test split
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    # Standardize features
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    # Train Ridge Regression Model
+    ridge = Ridge(alpha=1.0)
+    ridge.fit(X_train_scaled, y_train)
+
+    # Predictions
+    y_pred = ridge.predict(X_test_scaled)
+
+    # Evaluate
+    mae = mean_absolute_error(y_test, y_pred)
+    print(f"Mean Absolute Error (Ridge Regression): {mae}")
+
+
+def quick_pca_analysis(dataframe: pandas.DataFrame):
+    # Preprocessing
+    X = dataframe[
+        [Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]
+    ]
+
+    # Standardizing features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Apply PCA
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X_scaled)
+
+    # Visualize PCA components
+    plt.scatter(X_pca[:, 0], X_pca[:, 1], c=dataframe[Columns.DISEASE_DIAGNOSED])
+    plt.xlabel("PCA Component 1")
+    plt.ylabel("PCA Component 2")
+    plt.title("PCA of Healthcare Data")
+    plt.show()
+
+
 def main():
     file_path = "data/HealthcareData.csv"
     dataframe: pandas.DataFrame = pandas.read_csv(file_path)
@@ -358,6 +459,13 @@ def main():
     analyze_funding_type_prediction(dataframe=dataframe)
     analyze_patient_clustering(dataframe=dataframe)
     min_max_error_evaluation(dataframe=dataframe)
+
+    # Statistical analysis (ANOVA, etc)
+    quick_anova_analysis(dataframe=dataframe)
+    quick_two_way_anova_analysis(dataframe=dataframe)
+    quick_chi_square_analysis(dataframe=dataframe)
+    quick_mean_absolute_error_with_ridge_analysis(dataframe=dataframe)
+    quick_pca_analysis(dataframe=dataframe)
 
 
 if __name__ == "__main__":
