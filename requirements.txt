@@ -142,6 +142,7 @@ rsa==4.9
 safetensors==0.4.3
 scikit-learn==1.6.0
 scipy==1.14.1
+seaborn==0.13.2
 Send2Trash==1.8.3
 six==1.16.0
 smmap==5.0.1

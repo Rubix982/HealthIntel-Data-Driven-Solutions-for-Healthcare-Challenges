@@ -1,10 +1,11 @@
 import os
-import pandas
 import torch
-import torch.nn as nn
-import matplotlib.pyplot as plt
+import pandas
 import numpy as np
+import torch.nn as nn
+import seaborn as sns
 import statsmodel.api as sm
+import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.stats import chi2_contingency
 from statsmodel.formula.api import ols
@@ -13,9 +14,9 @@ from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, classification_report
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
+from sklearn.metrics import mean_absolute_error, classification_report, ConfusionMatrixDisplay
 from typing import Union
 
 
@@ -70,6 +71,12 @@ def get_plot_filepath(filename: str):
     return os.path.join(Constants.Paths.PLOT_OUTPUT_DIR, f"{filename}.png")
 
 
+def save_plot(figure, filename: str):
+    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
+    figure.savefig(get_plot_filepath(filename))
+    plt.close(figure)
+
+
 def analyze_column_statistics(
     dataframe: pandas.DataFrame,
 ) -> Union[pandas.Series, pandas.Series, dict[str, tuple]]:
@@ -108,6 +115,12 @@ def analyze_column_statistics(
         col: (dataframe[col].min(), dataframe[col].max()) for col in data_columns
     }
 
+    # Plot histograms for numeric columns
+    plt.figure(figsize=(10, 6))
+    dataframe[numeric_columns].hist(bins=20, color='c', edgecolor='black')
+    plt.suptitle('Numeric Columns Distribution')
+    save_plot(plt, 'numeric_columns_distribution')
+
     return numeric_stats, categorical_stats, date_stats
 
 
@@ -121,6 +134,13 @@ def analyze_demographics(dataframe: pandas.DataFrame) -> dict:
             Columns.CITY
         ].value_counts(),
     }
+
+    # Plot age distribution
+    plt.figure(figsize=(10, 6))
+    dataframe[Columns.AGE].plot(kind='hist', bins=20, color='g', edgecolor='black')
+    plt.title('Age Distribution')
+    save_plot(plt, 'age_distribution')
+
     return demographics
 
 
@@ -132,11 +152,25 @@ def analyze_disease_treatment(dataframe: pandas.DataFrame) -> dict:
         .value_counts()
         .head(),
     }
+
+    # Plot most frequent diseases
+    plt.figure(figsize=(10, 6))
+    dataframe[Columns.DISEASE_DIAGNOSED].value_counts().head().plot(kind='bar', color='b')
+    plt.title('Most Frequent Diseases')
+    save_plot(plt, 'most_frequent_diseases')
+
     return disease_treatment_analysis
 
 
 def analyze_resource_allocation(dataframe: pandas.DataFrame) -> pandas.Series[int]:
     hospital_volume: pandas.Series[int] = dataframe[Columns.HOSPITAL].value_counts()
+
+    # Plot hospital volume
+    plt.figure(figsize=(10, 6))
+    hospital_volume.plot(kind='bar', color='m')
+    plt.title('Hospital Volume Distribution')
+    save_plot(plt, 'hospital_volume_distribution')
+
     return hospital_volume
 
 
@@ -144,6 +178,13 @@ def analyze_funding_type(dataframe: pandas.DataFrame) -> pandas.Series[int]:
     funding_analysis: pandas.Series[int] = dataframe[
         Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF
     ].value_counts()
+
+    # Plot funding type distribution
+    plt.figure(figsize=(10, 6))
+    funding_analysis.plot(kind='bar', color='y')
+    plt.title('Funding Type Distribution')
+    save_plot(plt, 'funding_type_distribution')
+
     return funding_analysis
 
 
@@ -155,12 +196,26 @@ def analyze_los(dataframe: pandas.DataFrame) -> pandas.Series[any]:
         .mean()
         .dropna()
     )
+
+    # Plot LOS analysis by disease
+    plt.figure(figsize=(10, 6))
+    los_analysis.plot(kind='bar', color='r')
+    plt.title('Average Length of Stay by Disease')
+    save_plot(plt, 'average_los_by_disease')
+
     return los_analysis
 
 
 # Doctor Workload Analysis (Patient Count per Doctor)
 def analyze_doctor_workload(dataframe: pandas.DataFrame):
     doctor_workload = dataframe.groupby(Columns.DOCTOR_NAME)[Columns.PATIENT_ID].count()
+
+    # Plot doctor workload
+    plt.figure(figsize=(10, 6))
+    doctor_workload.plot(kind='bar', color='b')
+    plt.title('Doctor Workload (Patient Count)')
+    save_plot(plt, 'doctor_workload')
+
     return doctor_workload
 
 
@@ -206,6 +261,14 @@ def analyze_los_prediction(dataframe: pandas.DataFrame):
         mean_absolute_error(y_test, y_pred),
     )
 
+    # Plot actual vs predicted
+    plt.figure(figsize=(10, 6))
+    plt.plot(y_test.values, label='Actual LoS', color='g')
+    plt.plot(y_pred, label='Predicted LoS', color='r', linestyle='--')
+    plt.legend()
+    plt.title('Actual vs Predicted Length of Stay')
+    save_plot(plt, 'actual_vs_predicted_los')
+
 
 # Machine learning models to predict Funding Type
 def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
@@ -243,6 +306,12 @@ def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
         classification_report(y_test, y_pred),
     )
 
+    # Plot Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    disp.plot(cmap=plt.cm.Blues)
+    save_plot(plt, 'funding_type_confusion_matrix')
+
 
 # K-Means clustering to segment patients
 def analyze_patient_clustering(dataframe: pandas.DataFrame):
@@ -273,7 +342,7 @@ def analyze_patient_clustering(dataframe: pandas.DataFrame):
     plt.ylabel(Columns.GENDER)
     plt.title("Clustering Patients")
     plt.savefig(get_plot_filepath("patient_clustering"))
-    plt.close()
+    save_plot(plt, 'patient_segmentation_clusters')
 
 
 def min_max_error_evaluation(dataframe: pandas.DataFrame):
@@ -372,7 +441,13 @@ def quick_two_way_anova_analysis(dataframe: pandas.DataFrame):
 
     # Perform Two-Way ANOVA
     anova_results = sm.stats.anova_lm(model, type=2)
-    print(anova_results)
+    print("ANOVA Results:\n", anova_results)
+
+    # Plot ANOVA results
+    plt.figure(figsize=(10, 6))
+    anova_results.plot(kind='bar', color='c')
+    plt.title('ANOVA Results: Treatment Impact on Length of Stay')
+    save_plot(plt, 'anova_treatment_impact_los')
 
 
 def quick_chi_square_analysis(dataframe: pandas.DataFrame):
@@ -382,11 +457,20 @@ def quick_chi_square_analysis(dataframe: pandas.DataFrame):
         dataframe[Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF],
     )
 
-    # Perform Chi-Square test
-    chi2, p, _, _ = chi2_contingency(contingency_table)
+    # Perform Chi-Squared test
+    chi2_stat, p_value, dof, expected = chi2_contingency(contingency_table)
 
-    print(f"Chi-Square Statistics: {chi2}")
-    print(f"P-Value: {p}")
+    # Display results
+    print(f"Chi-Squared Test Statistic: {chi2_stat}")
+    print(f"P-Value: {p_value}")
+    print(f"Degrees of Freedom: {dof}")
+    print(f"Expected Frequencies:\n{expected}")
+
+    # Plot contingency table as heatmap
+    plt.figure(figsize=(10, 6))
+    sns.heatmap(contingency_table, annot=True, cmap=plt.cm.Blues, fmt='d')
+    plt.title('Chi-Squared Test: Disease vs Gender Distribution')
+    save_plot(plt, 'chi_squared_disease_gender')
 
 
 def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
@@ -415,6 +499,14 @@ def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
     mae = mean_absolute_error(y_test, y_pred)
     print(f"Mean Absolute Error (Ridge Regression): {mae}")
 
+    # Plot actual vs predicted
+    plt.figure(figsize=(10, 6))
+    plt.plot(y_test.values, label='Actual LoS', color='g')
+    plt.plot(y_pred, label='Predicted LoS', color='r', linestyle='--')
+    plt.legend()
+    plt.title('Ridge Regression: Actual vs Predicted Length of Stay')
+    save_plot(plt, 'ridge_regression_actual_vs_predicted_los')
+
 
 def quick_pca_analysis(dataframe: pandas.DataFrame):
     # Preprocessing
@@ -435,7 +527,7 @@ def quick_pca_analysis(dataframe: pandas.DataFrame):
     plt.xlabel("PCA Component 1")
     plt.ylabel("PCA Component 2")
     plt.title("PCA of Healthcare Data")
-    plt.show()
+    save_plot(plt, 'pca_patient_data')
 
 
 def main():
