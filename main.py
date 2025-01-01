@@ -1,3 +1,4 @@
+import os
 import pandas
 import torch
 import torch.nn as nn
@@ -19,6 +20,10 @@ from typing import Union
 
 
 class Constants:
+
+    class Paths:
+
+        PLOT_OUTPUT_DIR: str = "images"
 
     class DataTypes:
 
@@ -54,6 +59,15 @@ class Columns:
     DISCHARGE_DATE: str = "Discharge Date"
     LENGTH_OF_STAY: str = "Length of Stay"
     DISEASE_DIAGNOSED: str = "Disease Diagnosed"
+
+
+def create_output_folder(folder_path: str):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+
+def get_plot_filepath(filename: str):
+    return os.path.join(Constants.Paths.PLOT_OUTPUT_DIR, f"{filename}.png")
 
 
 def analyze_column_statistics(
@@ -258,7 +272,8 @@ def analyze_patient_clustering(dataframe: pandas.DataFrame):
     plt.xlabel(Columns.AGE)
     plt.ylabel(Columns.GENDER)
     plt.title("Clustering Patients")
-    plt.show()
+    plt.savefig(get_plot_filepath("patient_clustering"))
+    plt.close()
 
 
 def min_max_error_evaluation(dataframe: pandas.DataFrame):
@@ -430,6 +445,8 @@ def main():
     # Get all column names
     column_names = dataframe.columns
     print(f"Columns: {column_names}")
+
+    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
 
     numeric_stats, categorical_stats, date_stats = analyze_column_statistics(dataframe)
     print("Numeric Statistics:\n", numeric_stats)
