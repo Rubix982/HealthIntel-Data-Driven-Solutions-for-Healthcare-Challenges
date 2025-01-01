@@ -21,7 +21,14 @@ def analyze_column_statistics(
     dataframe["Discharge Date"] = pandas.to_datetime(
         dataframe["Discharge Date"], errors="coerce"
     )
-    data_columns = dataframe.select_dtypes(include=["datatime"]).columns
+
+    # Calculate Length of Stay
+    dataframe["Length of Stay"] = (
+        dataframe["Discharge Date"] - dataframe["Admit Date"]
+    ).dt.days
+
+    # Handle missing values for length of stay and dates
+    data_columns = dataframe.select_dtypes(include=["datetime"]).columns
     date_stats: dict[str, tuple] = {
         col: (dataframe[col].min(), dataframe[col].max()) for col in data_columns
     }
@@ -59,9 +66,10 @@ def analyze_funding_type(dataframe: pandas.DataFrame) -> pandas.Series[int]:
 
 # Length of Stay Analysis
 def analyze_los(dataframe: pandas.DataFrame) -> pandas.Series[any]:
+    # Ensure that missing Length of Stay values do not cause errors
     los_analysis: pandas.Series[any] = dataframe.groupby("Disease Diagnosed")[
-        "Length Of Stay"
-    ].mean()
+        "Length of Stay"
+    ].mean().dropna()
     return los_analysis
 
 
@@ -79,32 +87,28 @@ def main():
     column_names = dataframe.columns
     print(f"Columns: {column_names}")
 
-    dataframe["Length of Stay"] = (
-        dataframe["Discharge Date"] - dataframe["Admit Date"]
-    ).dt.days
-
     numeric_stats, categorical_stats, date_stats = analyze_column_statistics(dataframe)
     print("Numeric Statistics:\n", numeric_stats)
     print("\nCategorical Statistics:\n", categorical_stats)
     print("\nDate Statistics:\n", date_stats)
 
     demographics = analyze_demographics(dataframe=dataframe)
-    print("Demographics Analysis:", demographics)
+    print("\nDemographics Analysis:", demographics)
 
     disease_treatment = analyze_disease_treatment(dataframe=dataframe)
-    print("Disease and Treatment Analysis:", disease_treatment)
+    print("\nDisease and Treatment Analysis:", disease_treatment)
 
     resource_allocation = analyze_resource_allocation(dataframe=dataframe)
-    print("Resource Allocation:", resource_allocation)
+    print("\nResource Allocation:", resource_allocation)
 
     funding_type = analyze_funding_type(dataframe=dataframe)
-    print("Funding Type Analysis:", funding_type)
+    print("\nFunding Type Analysis:", funding_type)
 
     doctor_workload = analyze_doctor_workload(dataframe=dataframe)
-    print("Doctor Workload Analysis:", doctor_workload)
+    print("\nDoctor Workload Analysis:", doctor_workload)
 
     los_analysis = analyze_los(dataframe=dataframe)
-    print("Length of Stay Analysis:", los_analysis)
+    print("\nLength of Stay Analysis:", los_analysis)
 
 
 if __name__ == "__main__":
