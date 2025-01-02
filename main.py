@@ -111,18 +111,24 @@ def save_plot_html(figure, filename: str):
 
 # Enhanced Data Cleaning Function
 def clean_data(dataframe: pandas.DataFrame) -> pandas.DataFrame:
+    logger.info("Starting data cleaning process.")
+
     # Handling missing values
+    logger.debug("Handling missing values for Age and Length of Stay.")
     dataframe.fillna({
         Columns.AGE: dataframe[Columns.AGE].median(),
         Columns.LENGTH_OF_STAY: dataframe[Columns.LENGTH_OF_STAY].median()
     }, inplace=True)
 
     # Remove outliers based on Z-scores
+    logger.debug("Removing outliers in Length of Stay based on Z-scores.")
     z_scores = np.abs(stats.zscore(dataframe[Columns.LENGTH_OF_STAY]))
+    original_size = len(dataframe)
     dataframe = dataframe[(z_scores < 3)]
+    logger.info(f"Removed {original_size - len(dataframe)} outliers from the dataset.")
 
+    logger.info("Data cleaning process completed.")
     return dataframe
-
 
 # Enhanced Correlation Heatmap
 def enhanced_correlation_heatmap(dataframe: pandas.DataFrame):
