@@ -42,19 +42,15 @@ from typing import Union
 
 
 class Constants:
-
     class Paths:
-
         PLOT_OUTPUT_DIR: str = "images"
 
     class DataTypes:
-
         NUMBER: str = "number"
         OBJECT: str = "object"
         DATETIME: str = "datetime"
 
     class AnalysisKeys:
-
         CLUSTER: str = "Cluster"
         AGE_DISTRIBUTION: str = "Age Distribution"
         GENDER_DISTRIBUTION: str = "Gender Distribution"
@@ -63,14 +59,12 @@ class Constants:
         CORPORATE_CLIENT___OWN_SELF: str = "Corporate Client / Own Self"
 
     class Visualization:
-
         CMAP_VIRIDIS: str = "viridis"
 
     ERRORS_COERCE: str = "coerc"
 
 
 class Columns:
-
     AGE: str = "Age"
     CITY: str = "City"
     GENDER: str = "Gender"
@@ -93,28 +87,25 @@ def get_plot_filepath(filename: str):
     filename = (
         f"{filename}.png"
         if len(filename_split) == 1
-        or filename_split[-1] not in ["html", "png", "jpeg", "jpg", "gif"]
+           or filename_split[-1] not in ["html", "png", "jpeg", "jpg", "gif"]
         else filename
     )
     return os.path.join(Constants.Paths.PLOT_OUTPUT_DIR, filename)
 
 
 def save_plot(figure, filename: str):
-    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
     figure.savefig(get_plot_filepath(filename))
     plt.close(fig=figure)
 
 
 def save_plot_html(figure, filename: str):
-    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
     figure.write_html(get_plot_filepath(filename))
     plt.close(fig=figure)
 
 
 def analyze_column_statistics(
-    dataframe: pandas.DataFrame,
+        dataframe: pandas.DataFrame,
 ) -> Union[pandas.Series, pandas.Series, dict[str, tuple]]:
-
     # Numeric columns - descriptive statistics
 
     numeric_columns = dataframe.select_dtypes(
@@ -138,7 +129,7 @@ def analyze_column_statistics(
 
     # Calculate Length of Stay
     dataframe[Columns.LENGTH_OF_STAY] = (
-        dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]
+            dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]
     ).dt.days
 
     # Handle missing values for length of stay and dates
@@ -432,7 +423,7 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
 
         # Print loss every 10 epochs
         if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+            print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
 
     # Step 6: Predicting and Inverse Scaling
     model.eval()  # Switch to evaluation mode
@@ -575,203 +566,82 @@ def quick_pca_analysis(dataframe: pandas.DataFrame):
 
 
 def generate_additional_charts(dataframe: pandas.DataFrame) -> None:
-    # Create output folder for plots
-    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
+    for chart_function in [
+        plot_and_save_pie_charts,  # Pie Charts
+        plot_and_save_donut_charts,  # Donut Charts
+        plot_and_save_histograms,  # Histograms
+        plot_and_save_bar_charts,  # Bar Charts
+        plot_and_save_line_charts,  # Line Charts
+        plot_and_save_heatmaps,  # Heatmaps
+        plot_and_save_box_plots,  # Box Plots
+        plot_and_save_scatter_plots,  # Scatter Plots
+        plot_and_save_violin_plots,  # Violin Plots
+        plot_and_save_bubble_charts,  # Bubble Charts
+        plot_and_save_time_series_plots,  # Time Series Plots
+        plot_and_save_pair_plots,  # Pair Plots
+        plot_and_save_tree_maps,  # Tree Maps
+        plot_and_save_word_clouds,  # Word Clouds
+        plot_and_save_clustering_visualizations,  # Clustering Visualizations
+        plot_and_save_radar_charts,  # Radar Charts
+        plot_and_save_geographic_visualizations,  # Geographic Visualizations
+        plot_and_save_sankey_diagrams,  # Sankey Diagrams
+        plot_and_save_funnel_charts,  # Funnel Charts
+        plot_and_save_animated_charts_disease_trends  # Animated Charts
+    ]:
+        chart_function(dataframe=dataframe)
 
-    # Pie Chart: Distribution of Gender per City
-    gender_city = (
-        dataframe.groupby(Columns.CITY)[Columns.GENDER].value_counts().unstack()
-    )
-    gender_city.plot(kind="pie", subplots=True, figsize=(12, 6), autopct="%1.1f%%")
-    plt.title("Gender Distribution per City")
-    save_plot(gender_city, "gender_distribution_city")
 
-    # Donut Chart: Breakdown of Disease Diagnosed by Gender
-    disease_gender = dataframe.groupby(Columns.GENDER)[
-        Columns.DISEASE_DIAGNOSED
-    ].value_counts()
-    disease_gender.plot.pie(autopct="%1.1f%%", figsize=(8, 8))
-    circle = plt.Circle((0, 0), 0.7, color="white")
-    plt.gca().add_artist(circle)
-    plt.title("Disease Diagnosed by Gender")
-    save_plot(circle, "disease_gender_donut")
-
-    # Histogram: Distribution of Age with Gender Segmentation
-    plt.figure(figsize=(10, 6))
-    histplot_figure = sns.histplot(
-        data=dataframe, x=Columns.AGE, hue=Columns.GENDER, kde=True, bins=20
-    )
-    plt.title("Age Distribution by Gender")
-    save_plot(histplot_figure, "age_distribution_gender")
-
-    # Bar Chart: Average Length of Stay per Disease Diagnosed
-    avg_los_disease = dataframe.groupby(Columns.DISEASE_DIAGNOSED)[
-        Columns.LENGTH_OF_STAY
-    ].mean()
-    avg_loss_bar_plot = avg_los_disease.plot(
-        kind="bar", color="skyblue", figsize=(10, 6)
-    )
-    plt.title("Average Length of Stay per Disease Diagnosed")
-    save_plot(avg_loss_bar_plot, "avg_los_disease")
-
-    # Line Chart: Monthly Admission Trends
-    dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
-        dataframe[Columns.ADMIT_DATE], errors=Constants.ERRORS_COERCE
-    )
-    monthly_admissions = (
-        dataframe.set_index(Columns.ADMIT_DATE)
-        .resample("M")[Columns.PATIENT_ID]
-        .count()
-    )
-    line_plot = monthly_admissions.plot(
-        kind="line", marker="o", figsize=(10, 6), color="green"
-    )
-    plt.title("Monthly Admission Trends")
-    save_plot(line_plot, "monthly_admissions_trends")
-
-    # Heatmap: Correlation Between Numeric Columns
-    plt.figure(figsize=(10, 8))
-    correlation_matrix = dataframe.corr()
-    heatmap_plot_figure = sns.heatmap(
-        correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f"
-    )
-    plt.title("Correlation Heatmap of Numeric Columns")
-    save_plot(heatmap_plot_figure, "correlation_heatmap")
-
-    # Box Plot: Length of Stay by Disease Diagnosed
-    plt.figure(figsize=(12, 8))
-    boxplot_figure = sns.boxplot(
-        x=Columns.DISEASE_DIAGNOSED, y=Columns.LENGTH_OF_STAY, data=dataframe
-    )
-    plt.xticks(rotation=45)
-    plt.title("Length of Stay Distribution by Disease Diagnosed")
-    save_plot(boxplot_figure, "length_of_stay_boxplot")
-
-    # Scatter Plot: Age vs Length of Stay Colored by Gender
-    plt.figure(figsize=(10, 6))
-    scatterplot_figure = sns.scatterplot(
-        data=dataframe, x=Columns.AGE, y=Columns.LENGTH_OF_STAY, hue=Columns.GENDER
-    )
-    plt.title("Age vs Length of Stay by Gender")
-    save_plot(scatterplot_figure, "age_vs_los_scatter")
-
-    # Violin Plot: Age Distribution by Gender
-    plt.figure(figsize=(10, 6))
-    violinplot_figure = sns.violinplot(x=Columns.GENDER, y=Columns.AGE, data=dataframe)
-    plt.title("Age Distribution by Gender")
-    save_plot(violinplot_figure, "age_distribution_violin")
-
-    # Bubble Chart: Hospital vs Patients with Length of Stay as Bubble Size
-    hospital_patient_los = dataframe.groupby(Columns.HOSPITAL).agg(
-        patient_count=(Columns.PATIENT_ID, "count"),
-        avg_los=(Columns.LENGTH_OF_STAY, "mean"),
-    )
-    plt.figure(figsize=(12, 8))
-    scatter_plot = plt.scatter(
-        hospital_patient_los.index,
-        hospital_patient_los["patient_count"],
-        s=hospital_patient_los["avg_los"] * 50,  # Scale bubble size
-        alpha=0.6,
-    )
-    plt.xlabel("Hospital")
-    plt.ylabel("Number of Patients")
-    plt.title("Hospital vs Patients with Bubble Size as Length of Stay")
-    save_plot(scatter_plot, "hospital_bubble_chart")
-
-    # plot_top_diseases_by_city
-    diseases_by_city = (
-        dataframe.groupby([Columns.CITY, Columns.DISEASE_DIAGNOSED])[Columns.PATIENT_ID]
-        .count()
-        .unstack()
-        .fillna(0)
-    )
-    diseases_by_city_plot_figure = diseases_by_city.plot(
-        kind="bar", stacked=True, figsize=(12, 8), colormap="tab20"
-    )
-    plt.title("Top Diseases by City")
-    plt.ylabel("Number of Patients")
-    plt.xticks(rotation=45)
-    save_plot(diseases_by_city_plot_figure, "top_diseases_by_city")
-
-    # plot_avg_patient_age_by_hospital
-    avg_age_hospital = dataframe.groupby(Columns.HOSPITAL)[Columns.AGE].mean()
-    hospital_plot_figure = avg_age_hospital.plot(
-        kind="bar", color="orchid", figsize=(10, 6)
-    )
-    plt.title("Average Patient Age by Hospital")
-    save_plot(hospital_plot_figure, "avg_patient_age_hospital")
-
-    # plot_doctor_patient_ratio
-    doctor_patient_counts = dataframe.groupby(Columns.DOCTOR_NAME)[
-        Columns.PATIENT_ID
-    ].count()
-    counts_plot_figure = doctor_patient_counts.plot(
-        kind="bar", figsize=(12, 6), color="teal"
-    )
-    plt.title("Doctor-Patient Ratio")
-    save_plot(counts_plot_figure, "doctor_patient_ratio")
-
-    # Time-Series Analysis
-    ## plot_daily_admissions_trends
-    daily_admissions = dataframe.groupby(dataframe[Columns.ADMIT_DATE].dt.date)[
-        Columns.PATIENT_ID
-    ].count()
-    daily_admissions_plot_figure = daily_admissions.plot(
-        kind="line", figsize=(12, 6), marker="o", color="blue"
-    )
-    plt.title("Daily Admissions Trends")
-    save_plot(daily_admissions_plot_figure, "daily_admissions_trends")
-
-    ## plot_seasonal_los_trends
-    dataframe["Season"] = dataframe[Columns.ADMIT_DATE].dt.month % 12 // 3 + 1
-    seasonal_los = dataframe.groupby("Season")[Columns.LENGTH_OF_STAY].mean()
-    seasonal_los_plot_figure = seasonal_los.plot(
-        kind="bar", color="gold", figsize=(10, 6)
-    )
-    plt.title("Seasonal Length of Stay Trends")
-    save_plot(seasonal_los_plot_figure, "seasonal_los_trends")
-
-    ## plot_disease_trends_over_time
-    monthly_disease_trends = (
-        dataframe.groupby(
-            [dataframe[Columns.ADMIT_DATE].dt.to_period("M"), Columns.DISEASE_DIAGNOSED]
+def plot_and_save_radar_charts(dataframe):
+    def hospital_metrics_radar_chart():
+        hospital_stats = dataframe.groupby(Columns.HOSPITAL).agg(
+            patient_count=(Columns.PATIENT_ID, "count"),
+            avg_los=(Columns.LENGTH_OF_STAY, "mean"),
         )
-        .size()
-        .unstack()
-        .fillna(0)
-    )
-    monthly_disease_trends_plot_figure = monthly_disease_trends.plot(
-        kind="line", figsize=(14, 8), colormap="tab10"
-    )
-    plt.title("Disease Trends Over Time")
-    save_plot(monthly_disease_trends_plot_figure, "disease_trends_over_time")
+        categories = list(hospital_stats.columns)
+        values = hospital_stats.mean(axis=0).tolist()
+        values += values[:1]  # Circular for radar chart
+        angles = [n / float(len(categories)) * 2 * math.pi for n in range(len(categories))]
+        angles += angles[:1]
+        plt.figure(figsize=(10, 8))
+        ax = plt.subplot(111, polar=True)
+        plt.xticks(angles[:-1], categories)
+        ax.plot(angles, values)
+        ax.fill(angles, values, alpha=0.3)
+        plt.title("Radar Chart: Hospital Metrics")
+        save_plot(ax, "radar_chart_hospital_metrics")
 
-    # Pair Plots
-    ## plot_pairwise_relationships
-    pairplot_figure = sns.pairplot(
-        dataframe,
-        vars=[Columns.AGE, Columns.LENGTH_OF_STAY],
-        hue=Columns.GENDER,
-        palette="husl",
-    )
-    plt.title("Pairwise Relationships")
-    save_plot(pairplot_figure, "pairwise_relationships")
+    hospital_metrics_radar_chart()
 
-    # Tree Maps
-    ## plot_disease_distribution_treemap
-    disease_counts = dataframe[Columns.DISEASE_DIAGNOSED].value_counts()
-    squarify_plot_figure = squarify.plot(
-        sizes=disease_counts.values,
-        label=disease_counts.index,
-        alpha=0.8,
-        color=sns.color_palette("Paired"),
-    )
-    plt.title("Disease Distribution Tree Map")
-    plt.axis("off")
-    save_plot(squarify_plot_figure, "disease_distribution_treemap")
 
-    # Word Clouds
-    ## plot_word_cloud
+def plot_and_save_clustering_visualizations(dataframe):
+    def plot_cluster_heatmap():
+        dataframe_encoded = dataframe.copy()
+        label_encoder = LabelEncoder()
+        for col in [Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]:
+            dataframe_encoded[col] = label_encoder.fit_transform(dataframe_encoded[col])
+        cluster_corr = dataframe_encoded.corr()
+        cluster_corr_plot_figure = sns.heatmap(cluster_corr, annot=True, cmap="coolwarm")
+        plt.title("Cluster Heatmap")
+        save_plot(cluster_corr_plot_figure, "cluster_heatmap")
+
+    def plot_los_by_funding_type():
+        plt.figure(figsize=(12, 8))
+        corporate_client_boxplot_figure = sns.boxplot(
+            x=Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF,
+            y=Columns.LENGTH_OF_STAY,
+            data=dataframe,
+        )
+        plt.title("Length of Stay by Funding Type")
+        save_plot(corporate_client_boxplot_figure, "los_by_funding_type")
+
+    for plot_function in [
+        plot_cluster_heatmap,
+        plot_los_by_funding_type
+    ]:
+        plot_function()
+
+
+def plot_and_save_word_clouds(dataframe):
     def plot_word_cloud(column: str, title: str, filename: str) -> None:
         text = " ".join(dataframe[column].dropna())
         wordcloud = WordCloud(width=800, height=400, background_color="white").generate(
@@ -783,100 +653,314 @@ def generate_additional_charts(dataframe: pandas.DataFrame) -> None:
         plt.title(title)
         save_plot(imshow_figure, filename)
 
-    ## generate_word_clouds
-    plot_word_cloud(
-        dataframe,
-        Columns.DISEASE_DIAGNOSED,
-        "Common Diseases Diagnosed",
-        "common_diseases_wordcloud",
-    )
-    plot_word_cloud(
-        dataframe,
-        Columns.DOCTOR_NAME,
-        "Frequent Doctor Names",
-        "doctor_names_wordcloud",
-    )
+    def generate_word_clouds():
+        plot_word_cloud(
+            dataframe,
+            Columns.DISEASE_DIAGNOSED,
+            "Common Diseases Diagnosed",
+            "common_diseases_wordcloud",
+        )
+        plot_word_cloud(
+            dataframe,
+            Columns.DOCTOR_NAME,
+            "Frequent Doctor Names",
+            "doctor_names_wordcloud",
+        )
 
-    # Clustering Visualzations
-    ## plot_cluster_heatmap
-    dataframe_encoded = dataframe.copy()
-    label_encoder = LabelEncoder()
-    for col in [Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]:
-        dataframe_encoded[col] = label_encoder.fit_transform(dataframe_encoded[col])
-
-    cluster_corr = dataframe_encoded.corr()
-    cluster_corr_plot_figure = sns.heatmap(cluster_corr, annot=True, cmap="coolwarm")
-    plt.title("Cluster Heatmap")
-    save_plot(cluster_corr_plot_figure, "cluster_heatmap")
-
-    ## plot_los_by_funding_type
-    plt.figure(figsize=(12, 8))
-    corporate_client_boxplot_figure = sns.boxplot(
-        x=Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF,
-        y=Columns.LENGTH_OF_STAY,
-        data=dataframe,
-    )
-    plt.title("Length of Stay by Funding Type")
-    save_plot(corporate_client_boxplot_figure, "los_by_funding_type")
-
-    # Radar Charts
-    hospital_stats = dataframe.groupby(Columns.HOSPITAL).agg(
-        patient_count=(Columns.PATIENT_ID, "count"),
-        avg_los=(Columns.LENGTH_OF_STAY, "mean"),
-    )
-    categories = list(hospital_stats.columns)
-    values = hospital_stats.mean(axis=0).tolist()
-    values += values[:1]  # Circular for radar chart
-    angles = [n / float(len(categories)) * 2 * math.pi for n in range(len(categories))]
-    angles += angles[:1]
-
-    plt.figure(figsize=(10, 8))
-    ax = plt.subplot(111, polar=True)
-    plt.xticks(angles[:-1], categories)
-    ax.plot(angles, values)
-    ax.fill(angles, values, alpha=0.3)
-    plt.title("Radar Chart: Hospital Metrics")
-    save_plot(ax, "radar_chart_hospital_metrics")
-
-    plot_admissions_by_region(dataframe=dataframe)
-    plot_sankey_diagram(dataframe=dataframe)
-    plot_funnel_chart(dataframe=dataframe)
-    plot_animated_disease_trends(dataframe=dataframe)
+    generate_word_clouds()
 
 
-def plot_admissions_by_region(dataframe):
-    # Geolocate cities to get latitude and longitude
-    geolocator = Nominatim(user_agent="geoapi")
-    city_coords = {}
-    for city in dataframe[Columns.CITY].unique():
-        location = geolocator.geocode(city)
-        if location:
-            city_coords[city] = (location.latitude, location.longitude)
+def plot_and_save_tree_maps(dataframe):
+    def plot_disease_distribution_treemap():
+        disease_counts = dataframe[Columns.DISEASE_DIAGNOSED].value_counts()
+        squarify_plot_figure = squarify.plot(
+            sizes=disease_counts.values,
+            label=disease_counts.index,
+            alpha=0.8,
+            color=sns.color_palette("Paired"),
+        )
+        plt.title("Disease Distribution Tree Map")
+        plt.axis("off")
+        save_plot(squarify_plot_figure, "disease_distribution_treemap")
 
-    # Prepare a map
-    admission_map = folium.Map(
-        location=[20, 78], zoom_start=5
-    )  # Center map over an example region (India here)
+    plot_disease_distribution_treemap()
 
-    # Add markers for cities
-    for city, coords in city_coords.items():
-        patient_count = dataframe[dataframe[Columns.CITY] == city][
+
+def plot_and_save_pair_plots(dataframe):
+    def plot_pairwise_relationships():
+        pairplot_figure = sns.pairplot(
+            dataframe,
+            vars=[Columns.AGE, Columns.LENGTH_OF_STAY],
+            hue=Columns.GENDER,
+            palette="husl",
+        )
+        plt.title("Pairwise Relationships")
+        save_plot(pairplot_figure, "pairwise_relationships")
+
+    plot_pairwise_relationships()
+
+
+def plot_and_save_time_series_plots(dataframe):
+    def plot_daily_admissions_trends():
+        daily_admissions = dataframe.groupby(dataframe[Columns.ADMIT_DATE].dt.date)[
             Columns.PATIENT_ID
         ].count()
-        folium.CircleMarker(
-            location=coords,
-            radius=patient_count / 10,  # Scale the radius
-            popup=f"{city}: {patient_count} patients",
-            color="blue",
-            fill=True,
-            fill_color="blue",
-        ).add_to(admission_map)
+        daily_admissions_plot_figure = daily_admissions.plot(
+            kind="line", figsize=(12, 6), marker="o", color="blue"
+        )
+        plt.title("Daily Admissions Trends")
+        save_plot(daily_admissions_plot_figure, "daily_admissions_trends")
 
-    # Save the map as HTML
-    save_plot(admission_map, "admissions_by_region.html")
+    def plot_seasonal_los_trends():
+        dataframe["Season"] = dataframe[Columns.ADMIT_DATE].dt.month % 12 // 3 + 1
+        seasonal_los = dataframe.groupby("Season")[Columns.LENGTH_OF_STAY].mean()
+        seasonal_los_plot_figure = seasonal_los.plot(
+            kind="bar", color="gold", figsize=(10, 6)
+        )
+        plt.title("Seasonal Length of Stay Trends")
+        save_plot(seasonal_los_plot_figure, "seasonal_los_trends")
+
+    def plot_disease_trends_over_time():
+        monthly_disease_trends = (
+            dataframe.groupby(
+                [dataframe[Columns.ADMIT_DATE].dt.to_period("M"), Columns.DISEASE_DIAGNOSED]
+            )
+            .size()
+            .unstack()
+            .fillna(0)
+        )
+        monthly_disease_trends_plot_figure = monthly_disease_trends.plot(
+            kind="line", figsize=(14, 8), colormap="tab10"
+        )
+        plt.title("Disease Trends Over Time")
+        save_plot(monthly_disease_trends_plot_figure, "disease_trends_over_time")
+
+    for plot_function in [
+        plot_daily_admissions_trends,
+        plot_seasonal_los_trends,
+        plot_disease_trends_over_time
+    ]:
+        plot_function()
 
 
-def plot_sankey_diagram(dataframe):
+def plot_and_save_bubble_charts(dataframe):
+    def hospital_vs_patients_with_length_of_stay_as_bubble_size():
+        hospital_patient_los = dataframe.groupby(Columns.HOSPITAL).agg(
+            patient_count=(Columns.PATIENT_ID, "count"),
+            avg_los=(Columns.LENGTH_OF_STAY, "mean"),
+        )
+        plt.figure(figsize=(12, 8))
+        scatter_plot = plt.scatter(
+            hospital_patient_los.index,
+            hospital_patient_los["patient_count"],
+            s=hospital_patient_los["avg_los"] * 50,  # Scale bubble size
+            alpha=0.6,
+        )
+        plt.xlabel("Hospital")
+        plt.ylabel("Number of Patients")
+        plt.title("Hospital vs Patients with Bubble Size as Length of Stay")
+        save_plot(scatter_plot, "hospital_bubble_chart")
+
+    hospital_vs_patients_with_length_of_stay_as_bubble_size()
+
+
+def plot_and_save_violin_plots(dataframe):
+    def age_distribution_by_gender():
+        plt.figure(figsize=(10, 6))
+        violinplot_figure = sns.violinplot(x=Columns.GENDER, y=Columns.AGE, data=dataframe)
+        plt.title("Age Distribution by Gender")
+        save_plot(violinplot_figure, "age_distribution_violin")
+
+    age_distribution_by_gender()
+
+
+def plot_and_save_scatter_plots(dataframe):
+    def age_vs_length_of_stay_colored_by_gender():
+        plt.figure(figsize=(10, 6))
+        scatterplot_figure = sns.scatterplot(
+            data=dataframe, x=Columns.AGE, y=Columns.LENGTH_OF_STAY, hue=Columns.GENDER
+        )
+        plt.title("Age vs Length of Stay by Gender")
+        save_plot(scatterplot_figure, "age_vs_los_scatter")
+
+    age_vs_length_of_stay_colored_by_gender()
+
+
+def plot_and_save_box_plots(dataframe):
+    def length_of_stay_by_disease_diagnosed():
+        plt.figure(figsize=(12, 8))
+        boxplot_figure = sns.boxplot(
+            x=Columns.DISEASE_DIAGNOSED, y=Columns.LENGTH_OF_STAY, data=dataframe
+        )
+        plt.xticks(rotation=45)
+        plt.title("Length of Stay Distribution by Disease Diagnosed")
+        save_plot(boxplot_figure, "length_of_stay_boxplot")
+
+    length_of_stay_by_disease_diagnosed()
+
+
+def plot_and_save_heatmaps(dataframe):
+    def correlation_between_numeric_columns():
+        plt.figure(figsize=(10, 8))
+        correlation_matrix = dataframe.corr()
+        heatmap_plot_figure = sns.heatmap(
+            correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f"
+        )
+        plt.title("Correlation Heatmap of Numeric Columns")
+        save_plot(heatmap_plot_figure, "correlation_heatmap")
+
+    correlation_between_numeric_columns()
+
+
+def plot_and_save_line_charts(dataframe):
+    def monthly_admissions_trends():
+        dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
+            dataframe[Columns.ADMIT_DATE], errors=Constants.ERRORS_COERCE
+        )
+        monthly_admissions = (
+            dataframe.set_index(Columns.ADMIT_DATE)
+            .resample("M")[Columns.PATIENT_ID]
+            .count()
+        )
+        line_plot = monthly_admissions.plot(
+            kind="line", marker="o", figsize=(10, 6), color="green"
+        )
+        plt.title("Monthly Admission Trends")
+        save_plot(line_plot, "monthly_admissions_trends")
+
+    monthly_admissions_trends()
+
+
+def plot_and_save_bar_charts(dataframe):
+    def average_length_of_stay_per_disease_diagnosed():
+        avg_los_disease = dataframe.groupby(Columns.DISEASE_DIAGNOSED)[
+            Columns.LENGTH_OF_STAY
+        ].mean()
+        avg_loss_bar_plot = avg_los_disease.plot(
+            kind="bar", color="skyblue", figsize=(10, 6)
+        )
+        plt.title("Average Length of Stay per Disease Diagnosed")
+        save_plot(avg_loss_bar_plot, "avg_los_disease")
+
+    def plot_top_diseases_by_city():
+        diseases_by_city = (
+            dataframe.groupby([Columns.CITY, Columns.DISEASE_DIAGNOSED])[Columns.PATIENT_ID]
+            .count()
+            .unstack()
+            .fillna(0)
+        )
+        diseases_by_city_plot_figure = diseases_by_city.plot(
+            kind="bar", stacked=True, figsize=(12, 8), colormap="tab20"
+        )
+        plt.title("Top Diseases by City")
+        plt.ylabel("Number of Patients")
+        plt.xticks(rotation=45)
+        save_plot(diseases_by_city_plot_figure, "top_diseases_by_city")
+
+    def plot_avg_patient_age_by_hospital():
+        avg_age_hospital = dataframe.groupby(Columns.HOSPITAL)[Columns.AGE].mean()
+        hospital_plot_figure = avg_age_hospital.plot(
+            kind="bar", color="orchid", figsize=(10, 6)
+        )
+        plt.title("Average Patient Age by Hospital")
+        save_plot(hospital_plot_figure, "avg_patient_age_hospital")
+
+        # plot_doctor_patient_ratio
+        doctor_patient_counts = dataframe.groupby(Columns.DOCTOR_NAME)[
+            Columns.PATIENT_ID
+        ].count()
+        counts_plot_figure = doctor_patient_counts.plot(
+            kind="bar", figsize=(12, 6), color="teal"
+        )
+        plt.title("Doctor-Patient Ratio")
+        save_plot(counts_plot_figure, "doctor_patient_ratio")
+
+    for plot_function in [
+        average_length_of_stay_per_disease_diagnosed,
+        plot_top_diseases_by_city,
+        plot_avg_patient_age_by_hospital
+    ]:
+        plot_function()
+
+
+def plot_and_save_histograms(dataframe):
+    def distribution_of_age_with_gender_segmentation():
+        plt.figure(figsize=(10, 6))
+        histplot_figure = sns.histplot(
+            data=dataframe, x=Columns.AGE, hue=Columns.GENDER, kde=True, bins=20
+        )
+        plt.title("Age Distribution by Gender")
+        save_plot(histplot_figure, "age_distribution_gender")
+
+    distribution_of_age_with_gender_segmentation()
+
+
+def plot_and_save_donut_charts(dataframe):
+    def breakdown_of_disease_diagnosed_by_gender():
+        disease_gender = dataframe.groupby(Columns.GENDER)[
+            Columns.DISEASE_DIAGNOSED
+        ].value_counts()
+        disease_gender.plot.pie(autopct="%1.1f%%", figsize=(8, 8))
+        circle = plt.Circle((0, 0), 0.7, color="white")
+        plt.gca().add_artist(circle)
+        plt.title("Disease Diagnosed by Gender")
+        save_plot(circle, "disease_gender_donut")
+
+    breakdown_of_disease_diagnosed_by_gender()
+
+
+def plot_and_save_pie_charts(dataframe):
+    def distribution_of_gender_per_city():
+        gender_city = (
+            dataframe.groupby(Columns.CITY)[Columns.GENDER].value_counts().unstack()
+        )
+        fig, axes = plt.subplots(1, len(gender_city.columns), figsize=(15, 6))
+        for i, column in enumerate(gender_city.columns):
+            gender_city[column].plot(kind="pie", ax=axes[i], autopct="%1.1f%%", startangle=90, legend=False)
+            axes[i].set_ylabel('')  # Hide the y-axis label for clarity
+            axes[i].set_title(f"{column} Distribution")
+        plt.tight_layout()  # Adjust layout for better fit
+        save_plot(fig, "gender_distribution_city")
+
+    distribution_of_gender_per_city()
+
+
+def plot_and_save_geographic_visualizations(dataframe):
+    def plot_admissions_by_region():
+        # Geolocate cities to get latitude and longitude
+        geolocator = Nominatim(user_agent="geoapi")
+        city_coords = {}
+        for city in dataframe[Columns.CITY].unique():
+            location = geolocator.geocode(city)
+            if location:
+                city_coords[city] = (location.latitude, location.longitude)
+
+        # Prepare a map
+        admission_map = folium.Map(
+            location=[20, 78], zoom_start=5
+        )  # Center map over an example region (India here)
+
+        # Add markers for cities
+        for city, coords in city_coords.items():
+            patient_count = dataframe[dataframe[Columns.CITY] == city][
+                Columns.PATIENT_ID
+            ].count()
+            folium.CircleMarker(
+                location=coords,
+                radius=patient_count / 10,  # Scale the radius
+                popup=f"{city}: {patient_count} patients",
+                color="blue",
+                fill=True,
+                fill_color="blue",
+            ).add_to(admission_map)
+
+        # Save the map as HTML
+        save_plot(admission_map, "admissions_by_region.html")
+
+    plot_admissions_by_region()
+
+
+def plot_and_save_sankey_diagrams(dataframe):
     # Prepare data for the Sankey diagram
     source = []
     target = []
@@ -924,7 +1008,7 @@ def plot_sankey_diagram(dataframe):
     save_plot_html(fig, "sankey_patient_flow.html")
 
 
-def plot_funnel_chart(dataframe):
+def plot_and_save_funnel_charts(dataframe):
     # Prepare data for funnel
     stages = ["Admissions", "Diagnoses", "Discharges"]
     counts = [
@@ -939,7 +1023,7 @@ def plot_funnel_chart(dataframe):
     save_plot_html(fig, "funnel_chart.html")
 
 
-def plot_animated_disease_trends(dataframe):
+def plot_and_save_animated_charts_disease_trends(dataframe):
     # Prepare data for animation
     dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(dataframe[Columns.ADMIT_DATE])
     dataframe["YearMonth"] = dataframe[Columns.ADMIT_DATE].dt.to_period("M").astype(str)
@@ -965,6 +1049,7 @@ def plot_animated_disease_trends(dataframe):
 def main():
     file_path = "data/HealthcareData.csv"
     dataframe: pandas.DataFrame = pandas.read_csv(file_path)
+    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
 
     # Get all column names
     print(f"Columns: {dataframe.columns}")
