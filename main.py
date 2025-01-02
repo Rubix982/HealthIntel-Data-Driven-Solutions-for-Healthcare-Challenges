@@ -1,47 +1,45 @@
 # Alias imports
 import os
-import math
-import torch
-import pandas
-import folium
-import squarify
-import numpy as np
-import torch.nn as nn
-import seaborn as sns
-import statsmodels.api as sm
-import matplotlib.pyplot as plt
 
-## Plotly imports
+import folium
+import math
+import pandas
 import plotly.express as px
 import plotly.graph_objects as go
-
-# From imports
-from scipy import stats
-from wordcloud import WordCloud
+import squarify
+import statsmodels.api as sm
+import torch
+import torch.nn as nn
 from geopy.geocoders import Nominatim
+from pandas import Series
+from scipy import stats
 from scipy.stats import chi2_contingency
-
-## Statsmodel imports
-from statsmodels.formula.api import ols
-from statsmodels.stats.anova import AnovaRM
-
-## Sklearn imports
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
+from sklearn.linear_model import Ridge
 from sklearn.metrics import (
     confusion_matrix,
     mean_absolute_error,
     classification_report,
     ConfusionMatrixDisplay,
 )
-from typing import Union
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from statsmodels.formula.api import ols
+from wordcloud import WordCloud
 
 
 class Constants:
+    class Matplotlib:
+        class CMapColors:
+            VIRIDIS: str = "viridis"
+            BLUES: str = "Blues"
+            COOL_WARM: str = "coolwarm"
+
+        class Colors:
+            SKY_BLUE: str = "skyblue"
+
     class Paths:
         PLOT_OUTPUT_DIR: str = "images"
 
@@ -61,7 +59,7 @@ class Constants:
     class Visualization:
         CMAP_VIRIDIS: str = "viridis"
 
-    ERRORS_COERCE: str = "coerc"
+    ERRORS_COERCE = "coerce"
 
 
 class Columns:
@@ -105,7 +103,7 @@ def save_plot_html(figure, filename: str):
 
 def analyze_column_statistics(
         dataframe: pandas.DataFrame,
-) -> Union[pandas.Series, pandas.Series, dict[str, tuple]]:
+) -> tuple[Series, Series, dict[str, tuple]]:
     # Numeric columns - descriptive statistics
 
     numeric_columns = dataframe.select_dtypes(
@@ -121,10 +119,10 @@ def analyze_column_statistics(
 
     # Date columns - time range statistics
     dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
-        dataframe[Columns.ADMIT_DATE], errors=Constants.ERRORS_COERCE
+        dataframe[Columns.ADMIT_DATE], errors="coerce"
     )
     dataframe[Columns.DISCHARGE_DATE] = pandas.to_datetime(
-        dataframe[Columns.DISCHARGE_DATE], errors=Constants.ERRORS_COERCE
+        dataframe[Columns.DISCHARGE_DATE], errors="coerce"
     )
 
     # Calculate Length of Stay
@@ -142,9 +140,9 @@ def analyze_column_statistics(
 
     # Plot histograms for numeric columns
     plt.figure(figsize=(10, 6))
-    figure = dataframe[numeric_columns].hist(bins=20, color="c", edgecolor="black")
+    dataframe[numeric_columns].hist(bins=20, color="c", edgecolor="black")
     plt.suptitle("Numeric Columns Distribution")
-    save_plot(figure, "numeric_columns_distribution")
+    save_plot(plt.gcf(), "numeric_columns_distribution")
 
     return numeric_stats, categorical_stats, date_stats
 
@@ -162,11 +160,11 @@ def analyze_demographics(dataframe: pandas.DataFrame) -> dict:
 
     # Plot age distribution
     plt.figure(figsize=(10, 6))
-    plot_figure = dataframe[Columns.AGE].plot(
+    dataframe[Columns.AGE].plot(
         kind="hist", bins=20, color="g", edgecolor="black"
     )
     plt.title("Age Distribution")
-    save_plot(plot_figure, "age_distribution")
+    save_plot(plt.gcf(), "age_distribution")
 
     return demographics
 
@@ -182,14 +180,9 @@ def analyze_disease_treatment(dataframe: pandas.DataFrame) -> dict:
 
     # Plot most frequent diseases
     plt.figure(figsize=(10, 6))
-    plot_figure = (
-        dataframe[Columns.DISEASE_DIAGNOSED]
-        .value_counts()
-        .head()
-        .plot(kind="bar", color="b")
-    )
+    dataframe[Columns.DISEASE_DIAGNOSED].value_counts().head().plot(kind="bar", color="b")
     plt.title("Most Frequent Diseases")
-    save_plot(plot_figure, "most_frequent_diseases")
+    save_plot(plt.gcf(), "most_frequent_diseases")
 
     return disease_treatment_analysis
 
@@ -199,9 +192,9 @@ def analyze_resource_allocation(dataframe: pandas.DataFrame) -> pandas.Series:
 
     # Plot hospital volume
     plt.figure(figsize=(10, 6))
-    plot_figure = hospital_volume.plot(kind="bar", color="m")
+    hospital_volume.plot(kind="bar", color="m")
     plt.title("Hospital Volume Distribution")
-    save_plot(plot_figure, "hospital_volume_distribution")
+    save_plot(plt.gcf(), "hospital_volume_distribution")
 
     return hospital_volume
 
@@ -213,9 +206,9 @@ def analyze_funding_type(dataframe: pandas.DataFrame) -> pandas.Series:
 
     # Plot funding type distribution
     plt.figure(figsize=(10, 6))
-    bar_plot_figure = funding_analysis.plot(kind="bar", color="y")
+    funding_analysis.plot(kind="bar", color="y")
     plt.title("Funding Type Distribution")
-    save_plot(bar_plot_figure, "funding_type_distribution")
+    save_plot(plt.gcf(), "funding_type_distribution")
 
     return funding_analysis
 
@@ -231,9 +224,9 @@ def analyze_los(dataframe: pandas.DataFrame) -> pandas.Series:
 
     # Plot LOS analysis by disease
     plt.figure(figsize=(10, 6))
-    plot_figure = los_analysis.plot(kind="bar", color="r")
+    los_analysis.plot(kind="bar", color="r")
     plt.title("Average Length of Stay by Disease")
-    save_plot(plot_figure, "average_los_by_disease")
+    save_plot(plt.gcf(), "average_los_by_disease")
 
     return los_analysis
 
@@ -244,9 +237,9 @@ def analyze_doctor_workload(dataframe: pandas.DataFrame):
 
     # Plot doctor workload
     plt.figure(figsize=(10, 6))
-    bar_plot_figure = doctor_workload.plot(kind="bar", color="b")
+    doctor_workload.plot(kind="bar", color="b")
     plt.title("Doctor Workload (Patient Count)")
-    save_plot(bar_plot_figure, "doctor_workload")
+    save_plot(plt.gcf(), "doctor_workload")
 
     return doctor_workload
 
@@ -267,27 +260,27 @@ def analyze_los_prediction(dataframe: pandas.DataFrame):
     )
 
     # Features and target
-    X = dataframe[
+    x = dataframe[
         [Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]
     ]  # Add more features if necessary
     y = dataframe[Columns.LENGTH_OF_STAY]
 
     # Train/test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
     )
 
     # Standardizing features
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_test_scaled = scaler.transform(x_test)
 
     # Train Random Forest Regressor
     model = RandomForestRegressor()
-    model.fit(X_train_scaled, y_train)
+    model.fit(x_train_scaled, y_train)
 
     # Predictions and Evaluation
-    y_pred = model.predict(X_test_scaled)
+    y_pred = model.predict(x_test_scaled)
     print(
         "Length of Stay Prediction Mean Absolute Error:",
         mean_absolute_error(y_test, y_pred),
@@ -315,7 +308,7 @@ def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
     )
 
     # Features and target
-    X = dataframe[
+    x = dataframe[
         [Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]
     ]  # Add more features if necessary
     y = label_encoder.fit_transform(
@@ -323,16 +316,16 @@ def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
     )
 
     # Train/test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
     )
 
     # Train Random Forest Classifier
     model = RandomForestClassifier()
-    model.fit(X_train, y_train)
+    model.fit(x_train, y_train)
 
     # Predictions and Evaluation
-    y_pred = model.predict(X_test)
+    y_pred = model.predict(x_test)
     print(
         "Funding Type Prediction Classification Report:\n",
         classification_report(y_test, y_pred),
@@ -341,8 +334,8 @@ def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
     # Plot Confusion Matrix
     cm = confusion_matrix(y_test, y_pred)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    disp.plot(cmap=plt.cm.Blues)
-    save_plot(disp, "funding_type_confusion_matrix")
+    disp.plot(cmap=Constants.Matplotlib.CMapColors.BLUES)
+    save_plot(disp.figure_, "funding_type_confusion_matrix")
 
 
 # K-Means clustering to segment patients
@@ -355,25 +348,25 @@ def analyze_patient_clustering(dataframe: pandas.DataFrame):
     )
 
     # Features for clustering
-    X = dataframe[
+    x = dataframe[
         [Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED]
     ]  # Modify with relevant features
 
     # Apply KMeans
     kmeans = KMeans(n_clusters=3, random_state=42)
-    dataframe[Constants.CLUSTER] = kmeans.fit_predict(X)
+    dataframe[Constants.AnalysisKeys.CLUSTER] = kmeans.fit_predict(x)
 
     # Plot the clusters
     scatter_plot = plt.scatter(
         dataframe[Columns.AGE],
         dataframe[Columns.GENDER],
-        c=dataframe[Constants.CLUSTER],
+        c=dataframe[Constants.AnalysisKeys.CLUSTER],
         cmap=Constants.Visualization.CMAP_VIRIDIS,
     )
     plt.xlabel(Columns.AGE)
     plt.ylabel(Columns.GENDER)
     plt.title("Clustering Patients")
-    save_plot(scatter_plot, "patient_segmentation_clusters")
+    save_plot(scatter_plot.figure, "patient_segmentation_clusters")
 
 
 def min_max_error_evaluation(dataframe: pandas.DataFrame):
@@ -383,9 +376,9 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
 
     # X will contain the sequence of previous LOS values
     # y will contain the next day's LOS (predicting the next value)
-    X = (
+    x = (
         torch.tensor(data_scaled[:-1]).float().view(-1, 1, 1)
-    )  # 3D shape: [samples, timesteps, features]
+    )  # 3D shape: [samples, timestamps, features]
     y = torch.tensor(data_scaled[1:]).float()
 
     # Step 2: Define the LSTM Model
@@ -395,8 +388,8 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
             self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
             self.fc = nn.Linear(hidden_size, output_size)
 
-        def forward(self, x):
-            out, _ = self.lstm(x)
+        def forward(self, lstm_x):
+            out, _ = self.lstm(lstm_x)
             out = self.fc(out[:, -1, :])  # Only take the last output from the LSTM
             return out
 
@@ -413,7 +406,7 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
         model.train()
 
         # Forward pass
-        outputs = model(X)
+        outputs = model(x)
         loss = criterion(outputs, y)
 
         # Backward pass and optimization
@@ -428,9 +421,9 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
     # Step 6: Predicting and Inverse Scaling
     model.eval()  # Switch to evaluation mode
     with torch.no_grad():
-        predicted = model(X)
+        predicted = model(x)
 
-    # Convert predictions back to original scale
+    # Convert predictions back to an original scale
     predicted_values = scaler.inverse_transform(predicted.numpy())
     actual_values = scaler.inverse_transform(y.numpy())
 
@@ -500,33 +493,33 @@ def quick_chi_square_analysis(dataframe: pandas.DataFrame):
     # Plot contingency table as heatmap
     plt.figure(figsize=(10, 6))
     heatmap_plot_figure = sns.heatmap(
-        contingency_table, annot=True, cmap=plt.cm.Blues, fmt="d"
+        contingency_table, annot=True, cmap=Constants.Matplotlib.CMapColors.BLUES, fmt="d"
     )
-    plt.title("Chi-Squared Test: Disease vs Gender Distribution")
-    save_plot(heatmap_plot_figure, "chi_squared_disease_gender")
+    heatmap_plot_figure.set_title("Chi-Squared Test: Disease vs Gender Distribution")
+    save_plot(plt.gcf().figure, "chi_squared_disease_gender")
 
 
 def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
     # Preprocessing
-    X = dataframe[["Age", "Gender", "Disease Diagnosed", "Hospital"]]
+    x = dataframe[["Age", "Gender", "Disease Diagnosed", "Hospital"]]
     y = dataframe["Length_of_Stay"]
 
     # Train/Test split
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
     )
 
     # Standardize features
     scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_test_scaled = scaler.transform(x_test)
 
     # Train Ridge Regression Model
     ridge = Ridge(alpha=1.0)
-    ridge.fit(X_train_scaled, y_train)
+    ridge.fit(x_train_scaled, y_train)
 
     # Predictions
-    y_pred = ridge.predict(X_test_scaled)
+    y_pred = ridge.predict(x_test_scaled)
 
     # Evaluate
     mae = mean_absolute_error(y_test, y_pred)
@@ -543,26 +536,26 @@ def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
 
 def quick_pca_analysis(dataframe: pandas.DataFrame):
     # Preprocessing
-    X = dataframe[
+    x = dataframe[
         [Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]
     ]
 
     # Standardizing features
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    x_scaled = scaler.fit_transform(x)
 
     # Apply PCA
     pca = PCA(n_components=2)
-    X_pca = pca.fit_transform(X_scaled)
+    x_pca = pca.fit_transform(x_scaled)
 
     # Visualize PCA components
     scatter_plot = plt.scatter(
-        X_pca[:, 0], X_pca[:, 1], c=dataframe[Columns.DISEASE_DIAGNOSED]
+        x_pca[:, 0], x_pca[:, 1], c=dataframe[Columns.DISEASE_DIAGNOSED]
     )
     plt.xlabel("PCA Component 1")
     plt.ylabel("PCA Component 2")
     plt.title("PCA of Healthcare Data")
-    save_plot(scatter_plot, "pca_patient_data")
+    save_plot(scatter_plot.figure, "pca_patient_data")
 
 
 def generate_additional_charts(dataframe: pandas.DataFrame) -> None:
@@ -583,7 +576,7 @@ def generate_additional_charts(dataframe: pandas.DataFrame) -> None:
         plot_and_save_word_clouds,  # Word Clouds
         plot_and_save_clustering_visualizations,  # Clustering Visualizations
         plot_and_save_radar_charts,  # Radar Charts
-        plot_and_save_geographic_visualizations,  # Geographic Visualizations
+        # plot_and_save_geographic_visualizations,  # Geographic Visualizations
         plot_and_save_sankey_diagrams,  # Sankey Diagrams
         plot_and_save_funnel_charts,  # Funnel Charts
         plot_and_save_animated_charts_disease_trends  # Animated Charts
@@ -608,21 +601,39 @@ def plot_and_save_radar_charts(dataframe):
         ax.plot(angles, values)
         ax.fill(angles, values, alpha=0.3)
         plt.title("Radar Chart: Hospital Metrics")
-        save_plot(ax, "radar_chart_hospital_metrics")
+        save_plot(plt.gcf().figure, "radar_chart_hospital_metrics")
 
     hospital_metrics_radar_chart()
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import LabelEncoder
 
 
 def plot_and_save_clustering_visualizations(dataframe):
     def plot_cluster_heatmap():
         dataframe_encoded = dataframe.copy()
         label_encoder = LabelEncoder()
+
+        # Apply LabelEncoder only to categorical columns
         for col in [Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]:
-            dataframe_encoded[col] = label_encoder.fit_transform(dataframe_encoded[col])
-        cluster_corr = dataframe_encoded.corr()
-        cluster_corr_plot_figure = sns.heatmap(cluster_corr, annot=True, cmap="coolwarm")
-        plt.title("Cluster Heatmap")
-        save_plot(cluster_corr_plot_figure, "cluster_heatmap")
+            if dataframe_encoded[col].dtype == 'object':  # Check if the column is categorical
+                dataframe_encoded[col] = label_encoder.fit_transform(dataframe_encoded[col])
+
+        # Select only numeric columns for correlation
+        numeric_dataframe = dataframe_encoded.select_dtypes(include=['number'])
+
+        # Compute the correlation matrix for numeric columns only
+        cluster_corr = numeric_dataframe.corr()
+
+        # Plot the heatmap
+        plt.figure(figsize=(10, 8))
+        cluster_corr_plot_figure = sns.heatmap(cluster_corr, annot=True, cmap=Constants.Matplotlib.CMapColors.COOL_WARM)
+        cluster_corr_plot_figure.set_title("Cluster Heatmap")
+
+        # Save the plot
+        save_plot(plt.gcf(), "cluster_heatmap")
 
     def plot_los_by_funding_type():
         plt.figure(figsize=(12, 8))
@@ -631,9 +642,10 @@ def plot_and_save_clustering_visualizations(dataframe):
             y=Columns.LENGTH_OF_STAY,
             data=dataframe,
         )
-        plt.title("Length of Stay by Funding Type")
-        save_plot(corporate_client_boxplot_figure, "los_by_funding_type")
+        corporate_client_boxplot_figure.set_title("Length of Stay by Funding Type")
+        save_plot(plt.gcf(), "los_by_funding_type")
 
+    # Plot both visualizations
     for plot_function in [
         plot_cluster_heatmap,
         plot_los_by_funding_type
@@ -651,17 +663,15 @@ def plot_and_save_word_clouds(dataframe):
         imshow_figure = plt.imshow(wordcloud, interpolation="bilinear")
         plt.axis("off")
         plt.title(title)
-        save_plot(imshow_figure, filename)
+        save_plot(imshow_figure.figure, filename)
 
     def generate_word_clouds():
         plot_word_cloud(
-            dataframe,
             Columns.DISEASE_DIAGNOSED,
             "Common Diseases Diagnosed",
             "common_diseases_wordcloud",
         )
         plot_word_cloud(
-            dataframe,
             Columns.DOCTOR_NAME,
             "Frequent Doctor Names",
             "doctor_names_wordcloud",
@@ -679,23 +689,23 @@ def plot_and_save_tree_maps(dataframe):
             alpha=0.8,
             color=sns.color_palette("Paired"),
         )
-        plt.title("Disease Distribution Tree Map")
+        squarify_plot_figure.set_title("Disease Distribution Tree Map")
         plt.axis("off")
-        save_plot(squarify_plot_figure, "disease_distribution_treemap")
+        save_plot(plt.gcf(), "disease_distribution_treemap")
 
     plot_disease_distribution_treemap()
 
 
 def plot_and_save_pair_plots(dataframe):
     def plot_pairwise_relationships():
-        pairplot_figure = sns.pairplot(
+        pair_plot_figure = sns.pairplot(
             dataframe,
             vars=[Columns.AGE, Columns.LENGTH_OF_STAY],
             hue=Columns.GENDER,
             palette="husl",
         )
         plt.title("Pairwise Relationships")
-        save_plot(pairplot_figure, "pairwise_relationships")
+        save_plot(pair_plot_figure.figure, "pairwise_relationships")
 
     plot_pairwise_relationships()
 
@@ -708,8 +718,8 @@ def plot_and_save_time_series_plots(dataframe):
         daily_admissions_plot_figure = daily_admissions.plot(
             kind="line", figsize=(12, 6), marker="o", color="blue"
         )
-        plt.title("Daily Admissions Trends")
-        save_plot(daily_admissions_plot_figure, "daily_admissions_trends")
+        daily_admissions_plot_figure.set_title("Daily Admissions Trends")
+        save_plot(plt.gcf(), "daily_admissions_trends")
 
     def plot_seasonal_los_trends():
         dataframe["Season"] = dataframe[Columns.ADMIT_DATE].dt.month % 12 // 3 + 1
@@ -717,8 +727,8 @@ def plot_and_save_time_series_plots(dataframe):
         seasonal_los_plot_figure = seasonal_los.plot(
             kind="bar", color="gold", figsize=(10, 6)
         )
-        plt.title("Seasonal Length of Stay Trends")
-        save_plot(seasonal_los_plot_figure, "seasonal_los_trends")
+        seasonal_los_plot_figure.set_title("Seasonal Length of Stay Trends")
+        save_plot(plt.gcf(), "seasonal_los_trends")
 
     def plot_disease_trends_over_time():
         monthly_disease_trends = (
@@ -732,8 +742,8 @@ def plot_and_save_time_series_plots(dataframe):
         monthly_disease_trends_plot_figure = monthly_disease_trends.plot(
             kind="line", figsize=(14, 8), colormap="tab10"
         )
-        plt.title("Disease Trends Over Time")
-        save_plot(monthly_disease_trends_plot_figure, "disease_trends_over_time")
+        monthly_disease_trends_plot_figure.set_title("Disease Trends Over Time")
+        save_plot(plt.gcf(), "disease_trends_over_time")
 
     for plot_function in [
         plot_daily_admissions_trends,
@@ -759,7 +769,7 @@ def plot_and_save_bubble_charts(dataframe):
         plt.xlabel("Hospital")
         plt.ylabel("Number of Patients")
         plt.title("Hospital vs Patients with Bubble Size as Length of Stay")
-        save_plot(scatter_plot, "hospital_bubble_chart")
+        save_plot(scatter_plot.figure, "hospital_bubble_chart")
 
     hospital_vs_patients_with_length_of_stay_as_bubble_size()
 
@@ -767,9 +777,9 @@ def plot_and_save_bubble_charts(dataframe):
 def plot_and_save_violin_plots(dataframe):
     def age_distribution_by_gender():
         plt.figure(figsize=(10, 6))
-        violinplot_figure = sns.violinplot(x=Columns.GENDER, y=Columns.AGE, data=dataframe)
-        plt.title("Age Distribution by Gender")
-        save_plot(violinplot_figure, "age_distribution_violin")
+        violin_plot_figure = sns.violinplot(x=Columns.GENDER, y=Columns.AGE, data=dataframe)
+        violin_plot_figure.set_title("Age Distribution by Gender")
+        save_plot(plt.gcf(), "age_distribution_violin")
 
     age_distribution_by_gender()
 
@@ -780,8 +790,8 @@ def plot_and_save_scatter_plots(dataframe):
         scatterplot_figure = sns.scatterplot(
             data=dataframe, x=Columns.AGE, y=Columns.LENGTH_OF_STAY, hue=Columns.GENDER
         )
-        plt.title("Age vs Length of Stay by Gender")
-        save_plot(scatterplot_figure, "age_vs_los_scatter")
+        scatterplot_figure.set_title("Age vs Length of Stay by Gender")
+        save_plot(plt.gcf(), "age_vs_los_scatter")
 
     age_vs_length_of_stay_colored_by_gender()
 
@@ -793,21 +803,29 @@ def plot_and_save_box_plots(dataframe):
             x=Columns.DISEASE_DIAGNOSED, y=Columns.LENGTH_OF_STAY, data=dataframe
         )
         plt.xticks(rotation=45)
-        plt.title("Length of Stay Distribution by Disease Diagnosed")
-        save_plot(boxplot_figure, "length_of_stay_boxplot")
+        boxplot_figure.set_title("Length of Stay Distribution by Disease Diagnosed")
+        save_plot(plt.gcf(), "length_of_stay_boxplot")
 
     length_of_stay_by_disease_diagnosed()
 
 
-def plot_and_save_heatmaps(dataframe):
+def plot_and_save_heatmaps(dataframe: pandas.DataFrame):
     def correlation_between_numeric_columns():
+        # Select only numeric columns
+        numeric_dataframe = dataframe.select_dtypes(include=['number'])
+
+        # Compute the correlation matrix for numeric columns only
+        correlation_matrix = numeric_dataframe.corr()
+
+        # Plot the heatmap
         plt.figure(figsize=(10, 8))
-        correlation_matrix = dataframe.corr()
         heatmap_plot_figure = sns.heatmap(
             correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f"
         )
-        plt.title("Correlation Heatmap of Numeric Columns")
-        save_plot(heatmap_plot_figure, "correlation_heatmap")
+        heatmap_plot_figure.set_title("Correlation Heatmap of Numeric Columns")
+
+        # Save the plot
+        save_plot(plt.gcf(), "correlation_heatmap")
 
     correlation_between_numeric_columns()
 
@@ -815,18 +833,18 @@ def plot_and_save_heatmaps(dataframe):
 def plot_and_save_line_charts(dataframe):
     def monthly_admissions_trends():
         dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
-            dataframe[Columns.ADMIT_DATE], errors=Constants.ERRORS_COERCE
+            dataframe[Columns.ADMIT_DATE], errors="coerce"
         )
         monthly_admissions = (
             dataframe.set_index(Columns.ADMIT_DATE)
-            .resample("M")[Columns.PATIENT_ID]
+            .resample("ME")[Columns.PATIENT_ID]
             .count()
         )
         line_plot = monthly_admissions.plot(
             kind="line", marker="o", figsize=(10, 6), color="green"
         )
-        plt.title("Monthly Admission Trends")
-        save_plot(line_plot, "monthly_admissions_trends")
+        line_plot.set_title("Monthly Admission Trends")
+        save_plot(plt.gcf(), "monthly_admissions_trends")
 
     monthly_admissions_trends()
 
@@ -837,10 +855,10 @@ def plot_and_save_bar_charts(dataframe):
             Columns.LENGTH_OF_STAY
         ].mean()
         avg_loss_bar_plot = avg_los_disease.plot(
-            kind="bar", color="skyblue", figsize=(10, 6)
+            kind="bar", color=Constants.Matplotlib.Colors.SKY_BLUE, figsize=(10, 6)
         )
-        plt.title("Average Length of Stay per Disease Diagnosed")
-        save_plot(avg_loss_bar_plot, "avg_los_disease")
+        avg_loss_bar_plot.set_title("Average Length of Stay per Disease Diagnosed")
+        save_plot(plt.gcf(), "avg_los_disease")
 
     def plot_top_diseases_by_city():
         diseases_by_city = (
@@ -852,18 +870,18 @@ def plot_and_save_bar_charts(dataframe):
         diseases_by_city_plot_figure = diseases_by_city.plot(
             kind="bar", stacked=True, figsize=(12, 8), colormap="tab20"
         )
-        plt.title("Top Diseases by City")
+        diseases_by_city_plot_figure.set_title("Top Diseases by City")
         plt.ylabel("Number of Patients")
         plt.xticks(rotation=45)
-        save_plot(diseases_by_city_plot_figure, "top_diseases_by_city")
+        save_plot(plt.gcf(), "top_diseases_by_city")
 
     def plot_avg_patient_age_by_hospital():
         avg_age_hospital = dataframe.groupby(Columns.HOSPITAL)[Columns.AGE].mean()
         hospital_plot_figure = avg_age_hospital.plot(
             kind="bar", color="orchid", figsize=(10, 6)
         )
-        plt.title("Average Patient Age by Hospital")
-        save_plot(hospital_plot_figure, "avg_patient_age_hospital")
+        hospital_plot_figure.set_title("Average Patient Age by Hospital")
+        save_plot(plt.gcf(), "avg_patient_age_hospital")
 
         # plot_doctor_patient_ratio
         doctor_patient_counts = dataframe.groupby(Columns.DOCTOR_NAME)[
@@ -872,8 +890,8 @@ def plot_and_save_bar_charts(dataframe):
         counts_plot_figure = doctor_patient_counts.plot(
             kind="bar", figsize=(12, 6), color="teal"
         )
-        plt.title("Doctor-Patient Ratio")
-        save_plot(counts_plot_figure, "doctor_patient_ratio")
+        counts_plot_figure.set_title("Doctor-Patient Ratio")
+        save_plot(plt.gcf(), "doctor_patient_ratio")
 
     for plot_function in [
         average_length_of_stay_per_disease_diagnosed,
@@ -886,11 +904,11 @@ def plot_and_save_bar_charts(dataframe):
 def plot_and_save_histograms(dataframe):
     def distribution_of_age_with_gender_segmentation():
         plt.figure(figsize=(10, 6))
-        histplot_figure = sns.histplot(
+        hist_plot_figure = sns.histplot(
             data=dataframe, x=Columns.AGE, hue=Columns.GENDER, kde=True, bins=20
         )
-        plt.title("Age Distribution by Gender")
-        save_plot(histplot_figure, "age_distribution_gender")
+        hist_plot_figure.set_title("Age Distribution by Gender")
+        save_plot(plt.gcf(), "age_distribution_gender")
 
     distribution_of_age_with_gender_segmentation()
 
@@ -904,7 +922,7 @@ def plot_and_save_donut_charts(dataframe):
         circle = plt.Circle((0, 0), 0.7, color="white")
         plt.gca().add_artist(circle)
         plt.title("Disease Diagnosed by Gender")
-        save_plot(circle, "disease_gender_donut")
+        save_plot(circle.figure, "disease_gender_donut")
 
     breakdown_of_disease_diagnosed_by_gender()
 
@@ -929,11 +947,11 @@ def plot_and_save_geographic_visualizations(dataframe):
     def plot_admissions_by_region():
         # Geolocate cities to get latitude and longitude
         geolocator = Nominatim(user_agent="geoapi")
-        city_coords = {}
+        city_coordinates = {}
         for city in dataframe[Columns.CITY].unique():
             location = geolocator.geocode(city)
             if location:
-                city_coords[city] = (location.latitude, location.longitude)
+                city_coordinates[city] = (location.latitude, location.longitude)
 
         # Prepare a map
         admission_map = folium.Map(
@@ -941,12 +959,12 @@ def plot_and_save_geographic_visualizations(dataframe):
         )  # Center map over an example region (India here)
 
         # Add markers for cities
-        for city, coords in city_coords.items():
+        for city, coordinate in city_coordinates.items():
             patient_count = dataframe[dataframe[Columns.CITY] == city][
                 Columns.PATIENT_ID
             ].count()
             folium.CircleMarker(
-                location=coords,
+                location=coordinate,
                 radius=patient_count / 10,  # Scale the radius
                 popup=f"{city}: {patient_count} patients",
                 color="blue",
@@ -955,7 +973,7 @@ def plot_and_save_geographic_visualizations(dataframe):
             ).add_to(admission_map)
 
         # Save the map as HTML
-        save_plot(admission_map, "admissions_by_region.html")
+        save_plot(plt.gcf(), "admissions_by_region.html")
 
     plot_admissions_by_region()
 
@@ -1005,7 +1023,7 @@ def plot_and_save_sankey_diagrams(dataframe):
     fig.update_layout(
         title_text="Patient Flow: City → Hospital → Disease", font_size=10
     )
-    save_plot_html(fig, "sankey_patient_flow.html")
+    fig.write_html(get_plot_filepath("sankey_patient_flow.html"))
 
 
 def plot_and_save_funnel_charts(dataframe):
@@ -1020,7 +1038,7 @@ def plot_and_save_funnel_charts(dataframe):
     fig = go.Figure(go.Funnel(y=stages, x=counts, textinfo="value+percent initial"))
 
     fig.update_layout(title_text="Patient Journey Funnel", font_size=10)
-    save_plot_html(fig, "funnel_chart.html")
+    fig.write_html(get_plot_filepath("funnel_chart.html"))
 
 
 def plot_and_save_animated_charts_disease_trends(dataframe):
@@ -1043,19 +1061,16 @@ def plot_and_save_animated_charts_disease_trends(dataframe):
         labels={Columns.DISEASE_DIAGNOSED: "Disease", Columns.PATIENT_ID: "Count"},
     )
 
-    save_plot_html(fig, "animated_disease_trends.html")
+    fig.write_html(get_plot_filepath("animated_disease_trends.html"))
 
 
 def main():
-    file_path = "data/HealthcareData.csv"
-    dataframe: pandas.DataFrame = pandas.read_csv(file_path)
-    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
+    dataframe = initialize()
 
     # Get all column names
     print(f"Columns: {dataframe.columns}")
 
     generate_additional_charts(dataframe=dataframe)
-    return
 
     numeric_stats, categorical_stats, date_stats = analyze_column_statistics(dataframe)
     print("Numeric Statistics:\n", numeric_stats)
@@ -1086,12 +1101,26 @@ def main():
     analyze_patient_clustering(dataframe=dataframe)
     min_max_error_evaluation(dataframe=dataframe)
 
-    # Statistical analysis (ANOVA, etc)
+    # Statistical analysis (ANOVA, etc.)
     quick_anova_analysis(dataframe=dataframe)
     quick_two_way_anova_analysis(dataframe=dataframe)
     quick_chi_square_analysis(dataframe=dataframe)
     quick_mean_absolute_error_with_ridge_analysis(dataframe=dataframe)
     quick_pca_analysis(dataframe=dataframe)
+
+
+def initialize():
+    file_path = "data/HealthcareData.csv"
+    dataframe: pandas.DataFrame = pandas.read_csv(file_path)
+    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
+
+    # Convert the 'DISCHARGE_DATE' and 'ADMIT_DATE' columns to datetime
+    dataframe[Columns.DISCHARGE_DATE] = pandas.to_datetime(dataframe[Columns.DISCHARGE_DATE], format='%Y-%m-%d')
+    dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(dataframe[Columns.ADMIT_DATE], format='%Y-%m-%d')
+
+    # Calculate the 'LENGTH_OF_STAY' by subtracting the dates
+    dataframe[Columns.LENGTH_OF_STAY] = (dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]).dt.days
+    return dataframe
 
 
 if __name__ == "__main__":
