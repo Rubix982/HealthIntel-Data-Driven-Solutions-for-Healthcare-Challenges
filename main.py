@@ -1,5 +1,8 @@
 # Alias imports
+import logging
 import os
+from datetime import datetime
+from logging import Logger
 
 import folium
 import math
@@ -28,6 +31,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from statsmodels.formula.api import ols
 from wordcloud import WordCloud
+
+# Global logger variable
+logger: Logger = None
 
 
 class Constants:
@@ -116,19 +122,6 @@ def analyze_column_statistics(
         include=[Constants.DataTypes.OBJECT]
     ).columns
     categorical_stats: pandas.Series = dataframe[categorical_columns].describe()
-
-    # Date columns - time range statistics
-    dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
-        dataframe[Columns.ADMIT_DATE], errors="coerce"
-    )
-    dataframe[Columns.DISCHARGE_DATE] = pandas.to_datetime(
-        dataframe[Columns.DISCHARGE_DATE], errors="coerce"
-    )
-
-    # Calculate Length of Stay
-    dataframe[Columns.LENGTH_OF_STAY] = (
-            dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]
-    ).dt.days
 
     # Handle missing values for length of stay and dates
     data_columns = dataframe.select_dtypes(
@@ -281,7 +274,7 @@ def analyze_los_prediction(dataframe: pandas.DataFrame):
 
     # Predictions and Evaluation
     y_pred = model.predict(x_test_scaled)
-    print(
+    log_time_info(
         "Length of Stay Prediction Mean Absolute Error:",
         mean_absolute_error(y_test, y_pred),
     )
@@ -326,7 +319,7 @@ def analyze_funding_type_prediction(dataframe: pandas.DataFrame):
 
     # Predictions and Evaluation
     y_pred = model.predict(x_test)
-    print(
+    log_time_info(
         "Funding Type Prediction Classification Report:\n",
         classification_report(y_test, y_pred),
     )
@@ -416,7 +409,7 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
 
         # Print loss every 10 epochs
         if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+            log_time_info(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
 
     # Step 6: Predicting and Inverse Scaling
     model.eval()  # Switch to evaluation mode
@@ -429,7 +422,7 @@ def min_max_error_evaluation(dataframe: pandas.DataFrame):
 
     # Step 7: Evaluate the Model
     mae = mean_absolute_error(actual_values, predicted_values)
-    print(f"Mean Absolute Error: {mae:.4f}")
+    log_time_info(f"Mean Absolute Error: {mae:.4f}")
 
     # plt.plot(actual_values, label="Actual LOS")
     # plt.plot(predicted_values, label="Predicted LOS")
@@ -452,26 +445,34 @@ def quick_anova_analysis(dataframe: pandas.DataFrame):
     # Perform one-way ANOVA
     f_stat, p_value = stats.f_oneway(*groups)
 
-    print("F-Statistic: ", f_stat)
-    print("P-Value:", p_value)
+    log_time_info("F-Statistic: ", f_stat)
+    log_time_info("P-Value:", p_value)
 
 
 def quick_two_way_anova_analysis(dataframe: pandas.DataFrame):
     # Fit the model
+    formula_mapping = {
+        "Length of Stay": "Length_of_Stay",
+        "Disease Diagnosed": "Disease_Diagnosed",
+        "Gender": "Gender"
+    }
+
+    renamed_dataframe = dataframe.rename(columns=formula_mapping)
+
     model = ols(
         "Length_of_Stay ~ C(Disease_Diagnosed) + C(Gender) + C(Disease_Diagnosed):C(Gender)",
-        data=dataframe,
+        data=renamed_dataframe,
     ).fit()
 
     # Perform Two-Way ANOVA
     anova_results = sm.stats.anova_lm(model, type=2)
-    print("ANOVA Results:\n", anova_results)
+    log_time_info("ANOVA Results:\n", anova_results)
 
     # Plot ANOVA results
     plt.figure(figsize=(10, 6))
     anova_results.plot(kind="bar", color="c")
     plt.title("ANOVA Results: Treatment Impact on Length of Stay")
-    save_plot(plt, "anova_treatment_impact_los")
+    save_plot(plt.gcf(), "anova_treatment_impact_los")
 
 
 def quick_chi_square_analysis(dataframe: pandas.DataFrame):
@@ -485,10 +486,10 @@ def quick_chi_square_analysis(dataframe: pandas.DataFrame):
     chi2_stat, p_value, dof, expected = chi2_contingency(contingency_table)
 
     # Display results
-    print(f"Chi-Squared Test Statistic: {chi2_stat}")
-    print(f"P-Value: {p_value}")
-    print(f"Degrees of Freedom: {dof}")
-    print(f"Expected Frequencies:\n{expected}")
+    log_time_info(f"Chi-Squared Test Statistic: {chi2_stat}")
+    log_time_info(f"P-Value: {p_value}")
+    log_time_info(f"Degrees of Freedom: {dof}")
+    log_time_info(f"Expected Frequencies:\n{expected}")
 
     # Plot contingency table as heatmap
     plt.figure(figsize=(10, 6))
@@ -501,8 +502,8 @@ def quick_chi_square_analysis(dataframe: pandas.DataFrame):
 
 def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
     # Preprocessing
-    x = dataframe[["Age", "Gender", "Disease Diagnosed", "Hospital"]]
-    y = dataframe["Length_of_Stay"]
+    x = dataframe[[Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]]
+    y = dataframe[Columns.LENGTH_OF_STAY]
 
     # Train/Test split
     x_train, x_test, y_train, y_test = train_test_split(
@@ -523,7 +524,7 @@ def quick_mean_absolute_error_with_ridge_analysis(dataframe: pandas.DataFrame):
 
     # Evaluate
     mae = mean_absolute_error(y_test, y_pred)
-    print(f"Mean Absolute Error (Ridge Regression): {mae}")
+    log_time_info(f"Mean Absolute Error (Ridge Regression): {mae}")
 
     # Plot actual vs predicted
     plot_figure = plt.figure(figsize=(10, 6))
@@ -1068,32 +1069,32 @@ def main():
     dataframe = initialize()
 
     # Get all column names
-    print(f"Columns: {dataframe.columns}")
+    log_time_info(f"Columns: {dataframe.columns}")
 
     generate_additional_charts(dataframe=dataframe)
 
     numeric_stats, categorical_stats, date_stats = analyze_column_statistics(dataframe)
-    print("Numeric Statistics:\n", numeric_stats)
-    print("\nCategorical Statistics:\n", categorical_stats)
-    print("\nDate Statistics:\n", date_stats)
+    log_time_info("Numeric Statistics:\n", numeric_stats)
+    log_time_info("\nCategorical Statistics:\n", categorical_stats)
+    log_time_info("\nDate Statistics:\n", date_stats)
 
     demographics = analyze_demographics(dataframe=dataframe)
-    print("\nDemographics Analysis:", demographics)
+    log_time_info("\nDemographics Analysis:", demographics)
 
     disease_treatment = analyze_disease_treatment(dataframe=dataframe)
-    print("\nDisease and Treatment Analysis:", disease_treatment)
+    log_time_info("\nDisease and Treatment Analysis:", disease_treatment)
 
     resource_allocation = analyze_resource_allocation(dataframe=dataframe)
-    print("\nResource Allocation:", resource_allocation)
+    log_time_info("\nResource Allocation:", resource_allocation)
 
     funding_type = analyze_funding_type(dataframe=dataframe)
-    print("\nFunding Type Analysis:", funding_type)
+    log_time_info("\nFunding Type Analysis:", funding_type)
 
     doctor_workload = analyze_doctor_workload(dataframe=dataframe)
-    print("\nDoctor Workload Analysis:", doctor_workload)
+    log_time_info("\nDoctor Workload Analysis:", doctor_workload)
 
     los_analysis = analyze_los(dataframe=dataframe)
-    print("\nLength of Stay Analysis:", los_analysis)
+    log_time_info("\nLength of Stay Analysis:", los_analysis)
 
     # ML analysis
     analyze_los_prediction(dataframe=dataframe)
@@ -1110,9 +1111,18 @@ def main():
 
 
 def initialize():
+    initialize_logger()
     file_path = "data/HealthcareData.csv"
     dataframe: pandas.DataFrame = pandas.read_csv(file_path)
     create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
+
+    # Date columns - time range statistics
+    dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
+        dataframe[Columns.ADMIT_DATE], errors="coerce"
+    )
+    dataframe[Columns.DISCHARGE_DATE] = pandas.to_datetime(
+        dataframe[Columns.DISCHARGE_DATE], errors="coerce"
+    )
 
     # Convert the 'DISCHARGE_DATE' and 'ADMIT_DATE' columns to datetime
     dataframe[Columns.DISCHARGE_DATE] = pandas.to_datetime(dataframe[Columns.DISCHARGE_DATE], format='%Y-%m-%d')
@@ -1121,6 +1131,47 @@ def initialize():
     # Calculate the 'LENGTH_OF_STAY' by subtracting the dates
     dataframe[Columns.LENGTH_OF_STAY] = (dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]).dt.days
     return dataframe
+
+
+def log_time_info(*args):
+    """
+    Helper function to log a message with the current timestamp.
+    Accepts multiple arguments similar to print and logs them as a single string.
+    """
+    message = " ".join(map(str, args))  # Convert all arguments to strings and join with a space
+    logger.info(f"[{datetime.now()}] {message}")
+
+
+def initialize_logger():
+    global logger
+    # Initialize the logger only once
+    if logger is None:
+        # Create a custom logger
+        logger = logging.getLogger(__name__)
+
+        # Set the minimum logging level (can be adjusted to DEBUG, INFO, etc.)
+        logger.setLevel(logging.DEBUG)
+
+        os.makedirs("logs", exist_ok=True)
+
+        # Create a file handler that logs to a file
+        file_handler = logging.FileHandler('logs/main.log', mode="w")
+        file_handler.setLevel(logging.DEBUG)
+
+        # Create a console handler that logs to the console
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+
+        # Create a log formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # Add the formatter to both handlers
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+
+        # Add the handlers to the logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
 
 
 if __name__ == "__main__":
