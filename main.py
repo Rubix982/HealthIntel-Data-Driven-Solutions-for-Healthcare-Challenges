@@ -16,7 +16,6 @@ import torch
 import torch.nn as nn
 from geopy.geocoders import Nominatim
 from lifelines import KaplanMeierFitter
-from pandas import Series
 from scipy import stats
 from scipy.stats import chi2_contingency
 from sklearn.cluster import KMeans
@@ -130,6 +129,7 @@ def clean_data(dataframe: pandas.DataFrame) -> pandas.DataFrame:
     logger.info("Data cleaning process completed.")
     return dataframe
 
+
 # Enhanced Correlation Heatmap
 def enhanced_correlation_heatmap(dataframe: pandas.DataFrame):
     plt.figure(figsize=(12, 10))
@@ -220,9 +220,7 @@ def survival_analysis(dataframe: pandas.DataFrame):
     save_plot(plt.gcf(), "survival_analysis")
 
 
-def analyze_column_statistics(
-        dataframe: pandas.DataFrame,
-) -> tuple[Series, Series, dict[str, tuple]]:
+def analyze_column_statistics(dataframe: pandas.DataFrame):
     # Numeric columns - descriptive statistics
 
     numeric_columns = dataframe.select_dtypes(
@@ -249,11 +247,12 @@ def analyze_column_statistics(
     dataframe[numeric_columns].hist(bins=20, color="c", edgecolor="black")
     plt.suptitle("Numeric Columns Distribution")
     save_plot(plt.gcf(), "numeric_columns_distribution")
+    log_time_info("Numeric Statistics:\n", numeric_stats)
+    log_time_info("\nCategorical Statistics:\n", categorical_stats)
+    log_time_info("\nDate Statistics:\n", date_stats)
 
-    return numeric_stats, categorical_stats, date_stats
 
-
-def analyze_demographics(dataframe: pandas.DataFrame) -> dict:
+def analyze_demographics(dataframe: pandas.DataFrame):
     demographics: dict = {
         Constants.AnalysisKeys.AGE_DISTRIBUTION: dataframe[Columns.AGE].describe(),
         Constants.AnalysisKeys.GENDER_DISTRIBUTION: dataframe[
@@ -271,11 +270,10 @@ def analyze_demographics(dataframe: pandas.DataFrame) -> dict:
     )
     plt.title("Age Distribution")
     save_plot(plt.gcf(), "age_distribution")
+    log_time_info("\nDemographics Analysis:", demographics)
 
-    return demographics
 
-
-def analyze_disease_treatment(dataframe: pandas.DataFrame) -> dict:
+def analyze_disease_treatment(dataframe: pandas.DataFrame):
     disease_treatment_analysis = {
         Constants.AnalysisKeys.MOST_FREQUENT_DISEASES: dataframe[
             Columns.DISEASE_DIAGNOSED
@@ -289,11 +287,10 @@ def analyze_disease_treatment(dataframe: pandas.DataFrame) -> dict:
     dataframe[Columns.DISEASE_DIAGNOSED].value_counts().head().plot(kind="bar", color="b")
     plt.title("Most Frequent Diseases")
     save_plot(plt.gcf(), "most_frequent_diseases")
+    log_time_info("\nDisease and Treatment Analysis:", disease_treatment_analysis)
 
-    return disease_treatment_analysis
 
-
-def analyze_resource_allocation(dataframe: pandas.DataFrame) -> pandas.Series:
+def analyze_resource_allocation(dataframe: pandas.DataFrame):
     hospital_volume: pandas.Series = dataframe[Columns.HOSPITAL].value_counts()
 
     # Plot hospital volume
@@ -301,11 +298,10 @@ def analyze_resource_allocation(dataframe: pandas.DataFrame) -> pandas.Series:
     hospital_volume.plot(kind="bar", color="m")
     plt.title("Hospital Volume Distribution")
     save_plot(plt.gcf(), "hospital_volume_distribution")
+    log_time_info("\nResource Allocation:", hospital_volume)
 
-    return hospital_volume
 
-
-def analyze_funding_type(dataframe: pandas.DataFrame) -> pandas.Series:
+def analyze_funding_type(dataframe: pandas.DataFrame):
     funding_analysis: pandas.Series = dataframe[
         Constants.AnalysisKeys.CORPORATE_CLIENT___OWN_SELF
     ].value_counts()
@@ -315,12 +311,11 @@ def analyze_funding_type(dataframe: pandas.DataFrame) -> pandas.Series:
     funding_analysis.plot(kind="bar", color="y")
     plt.title("Funding Type Distribution")
     save_plot(plt.gcf(), "funding_type_distribution")
-
-    return funding_analysis
+    log_time_info("\nFunding Type Analysis:", funding_analysis)
 
 
 # Length of Stay Analysis
-def analyze_los(dataframe: pandas.DataFrame) -> pandas.Series:
+def analyze_los(dataframe: pandas.DataFrame):
     # Ensure that missing Length of Stay values do not cause errors
     los_analysis: pandas.Series = (
         dataframe.groupby(Columns.DISEASE_DIAGNOSED)[Columns.LENGTH_OF_STAY]
@@ -333,8 +328,7 @@ def analyze_los(dataframe: pandas.DataFrame) -> pandas.Series:
     los_analysis.plot(kind="bar", color="r")
     plt.title("Average Length of Stay by Disease")
     save_plot(plt.gcf(), "average_los_by_disease")
-
-    return los_analysis
+    log_time_info("\nLength of Stay Analysis:", los_analysis)
 
 
 # Doctor Workload Analysis (Patient Count per Doctor)
@@ -346,8 +340,7 @@ def analyze_doctor_workload(dataframe: pandas.DataFrame):
     doctor_workload.plot(kind="bar", color="b")
     plt.title("Doctor Workload (Patient Count)")
     save_plot(plt.gcf(), "doctor_workload")
-
-    return doctor_workload
+    log_time_info("\nDoctor Workload Analysis:", doctor_workload)
 
 
 # Machine learning models to analyze Length of Stay (LoS) prediction
@@ -672,7 +665,7 @@ def quick_pca_analysis(dataframe: pandas.DataFrame):
     save_plot(scatter_plot.figure, "pca_patient_data")
 
 
-def generate_additional_charts(dataframe: pandas.DataFrame) -> None:
+def generate_main_charts(dataframe: pandas.DataFrame) -> None:
     for chart_function in [
         plot_and_save_pie_charts,  # Pie Charts
         plot_and_save_donut_charts,  # Donut Charts
@@ -1180,34 +1173,17 @@ def plot_and_save_animated_charts_disease_trends(dataframe):
 
 def main():
     dataframe = initialize()
+    # Generate main charts
+    generate_main_charts(dataframe=dataframe)
 
-    # Get all column names
-    log_time_info(f"Columns: {dataframe.columns}")
-
-    generate_additional_charts(dataframe=dataframe)
-
-    numeric_stats, categorical_stats, date_stats = analyze_column_statistics(dataframe)
-    log_time_info("Numeric Statistics:\n", numeric_stats)
-    log_time_info("\nCategorical Statistics:\n", categorical_stats)
-    log_time_info("\nDate Statistics:\n", date_stats)
-
-    demographics = analyze_demographics(dataframe=dataframe)
-    log_time_info("\nDemographics Analysis:", demographics)
-
-    disease_treatment = analyze_disease_treatment(dataframe=dataframe)
-    log_time_info("\nDisease and Treatment Analysis:", disease_treatment)
-
-    resource_allocation = analyze_resource_allocation(dataframe=dataframe)
-    log_time_info("\nResource Allocation:", resource_allocation)
-
-    funding_type = analyze_funding_type(dataframe=dataframe)
-    log_time_info("\nFunding Type Analysis:", funding_type)
-
-    doctor_workload = analyze_doctor_workload(dataframe=dataframe)
-    log_time_info("\nDoctor Workload Analysis:", doctor_workload)
-
-    los_analysis = analyze_los(dataframe=dataframe)
-    log_time_info("\nLength of Stay Analysis:", los_analysis)
+    # Basic data analysis
+    analyze_column_statistics(dataframe=dataframe)
+    analyze_demographics(dataframe=dataframe)
+    analyze_disease_treatment(dataframe=dataframe)
+    analyze_resource_allocation(dataframe=dataframe)
+    analyze_funding_type(dataframe=dataframe)
+    analyze_doctor_workload(dataframe=dataframe)
+    analyze_los(dataframe=dataframe)
 
     # ML analysis
     analyze_los_prediction(dataframe=dataframe)
@@ -1250,6 +1226,10 @@ def initialize():
 
     # Calculate the 'LENGTH_OF_STAY' by subtracting the dates
     dataframe[Columns.LENGTH_OF_STAY] = (dataframe[Columns.DISCHARGE_DATE] - dataframe[Columns.ADMIT_DATE]).dt.days
+
+    # Get all column names
+    log_time_info(f"Columns: {dataframe.columns}")
+
     return dataframe
 
 
