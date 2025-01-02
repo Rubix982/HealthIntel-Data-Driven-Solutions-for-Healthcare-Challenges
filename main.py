@@ -1,4 +1,4 @@
-# Alias imports
+import argparse
 import logging
 import os
 from datetime import datetime
@@ -7,6 +7,7 @@ from logging import Logger
 import folium
 import math
 import numpy as np
+import openai
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,8 +15,10 @@ import squarify
 import statsmodels.api as sm
 import torch
 import torch.nn as nn
+from dotenv import load_dotenv
 from geopy.geocoders import Nominatim
 from lifelines import KaplanMeierFitter
+from openai import OpenAI
 from scipy import stats
 from scipy.stats import chi2_contingency
 from sklearn.cluster import KMeans
@@ -33,6 +36,13 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from statsmodels.formula.api import ols
 from wordcloud import WordCloud
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Environment Variables
+OPENAI_API_KEY: str = ""
+OPENAI_CLIENT: openai.Client
+
 # Global logger variable
 logger: Logger = None
 
@@ -49,6 +59,7 @@ class Constants:
 
     class Paths:
         PLOT_OUTPUT_DIR: str = "images"
+        LOGS_DIR: str = "logs"
 
     class DataTypes:
         NUMBER: str = "number"
@@ -82,9 +93,21 @@ class Columns:
     DISEASE_DIAGNOSED: str = "Disease Diagnosed"
 
 
+def set_env_vars():
+    # Access the API key
+    global OPENAI_API_KEY
+    global OPENAI_CLIENT
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_CLIENT = OpenAI(api_key=OPENAI_API_KEY)
+
+    if not OPENAI_API_KEY:
+        log_time_info("OPENAI_API_KEY is not set in the .env file.")
+
+
 def create_output_folder(folder_path: str):
     if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+        logger.info(f"Creating folder: {folder_path}")
+        os.makedirs(folder_path, exist_ok=True)
 
 
 def get_plot_filepath(filename: str):
@@ -1207,10 +1230,8 @@ def main():
 
 
 def initialize():
-    initialize_logger()
     file_path = "data/HealthcareData.csv"
     dataframe: pandas.DataFrame = pandas.read_csv(file_path)
-    create_output_folder(Constants.Paths.PLOT_OUTPUT_DIR)
 
     # Date columns - time range statistics
     dataframe[Columns.ADMIT_DATE] = pandas.to_datetime(
@@ -1233,12 +1254,12 @@ def initialize():
     return dataframe
 
 
-def log_time_info(*args):
+def log_time_info(*message_args):
     """
     Helper function to log a message with the current timestamp.
     Accepts multiple arguments similar to print and logs them as a single string.
     """
-    message = " ".join(map(str, args))  # Convert all arguments to strings and join with a space
+    message = " ".join(map(str, message_args))  # Convert all arguments to strings and join with a space
     logger.info(f"[{datetime.now()}] {message}")
 
 
@@ -1255,10 +1276,8 @@ def initialize_logger():
     # Set the minimum logging level (can be adjusted to DEBUG, INFO, etc.)
     logger.setLevel(logging.DEBUG)
 
-    os.makedirs("logs", exist_ok=True)
-
     # Create a file handler that logs to a file
-    file_handler = logging.FileHandler('logs/main.log', mode="w")
+    file_handler = logging.FileHandler('logs/main.log')
     file_handler.setLevel(logging.DEBUG)
 
     # Create a console handler that logs to the console
@@ -1277,5 +1296,107 @@ def initialize_logger():
     logger.addHandler(console_handler)
 
 
+def chatgpt_feedback(log_text: str) -> str:
+    """
+    Send the ERD text to ChatGPT and retrieve the feedback in the requested format.
+
+    Args:
+        log_text (str): The ERD text to send to ChatGPT.
+
+    Returns:
+        str: The improved ERD text from ChatGPT.
+    """
+
+    global OPENAI_CLIENT
+    system_content = (
+        "You are an AI assistant that specializes in analyzing and generating reports from logs. "
+        "Your task is to review the log entries and derive key insights such as trends, anomalies, and important observations. "
+        "You should identify patterns in data, such as distributions, correlations, and outliers, and summarize them clearly. "
+        "Additionally, you should generate a well-structured, concise report highlighting key takeaways and relevant statistics. "
+        "Return only the generated report, with no preamble or explanation."
+    )
+
+    user_content = (
+        f"Please analyze the following log data and generate a detailed report summarizing the insights. "
+        f"Focus on trends in the numerical data, correlations between variables, anomalies in the categorical data, and any "
+        f"interesting patterns or observations. Provide a well-organized report with sections for each major insight:\n\n{log_text}"
+    )
+
+    try:
+        response = OPENAI_CLIENT.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.7,
+        )
+
+        # Extract the generated content
+        feedback = response.choices[0].message.content.strip()
+
+        # Safeguard: Verify if the response contains valid ERD-like structure
+        if not feedback:
+            raise ValueError("ChatGPT returned an empty response. No ERD output found.")
+
+        # Log successful interaction
+        log_time_info("Received feedback from ChatGPT.")
+        return feedback.replace("```", "")
+
+    except openai.AuthenticationError:
+        log_time_info("Authentication error: Ensure the OPENAI_API_KEY is set correctly.")
+        raise
+
+    except openai.APIConnectionError:
+        log_time_info("Network issue: Unable to connect to the OpenAI API.")
+        raise
+
+    except openai.OpenAIError as e:
+        log_time_info(f"OpenAI API error: {e}")
+        raise
+
+    except Exception as e:
+        log_time_info(f"Unexpected error while interacting with ChatGPT: {e}")
+        raise
+
+
+def generate_gpt_insights():
+    try:
+        with open(f"{Constants.Paths.LOGS_DIR}/main.log", "r") as f:
+            main_log = f.read()
+    except FileNotFoundError:
+        logger.error("main.log file not found.")
+        return
+
+    feedback = chatgpt_feedback(main_log)
+    if not feedback:
+        logger.error("No feedback generated.")
+        return
+
+    try:
+        i = 0
+        while os.path.exists(f"{Constants.Paths.LOGS_DIR}/feedback_{i}.log"):
+            i += 1
+        with open(f"{Constants.Paths.LOGS_DIR}/feedback_{i}.log", "w") as f:
+            f.write(feedback)
+    except FileNotFoundError:
+        logger.error("feedback.log file could not be saved to.")
+        return
+
+
 if __name__ == "__main__":
-    main()
+    set_env_vars()
+    for folder in [Constants.Paths.LOGS_DIR, Constants.Paths.PLOT_OUTPUT_DIR]:
+        create_output_folder(folder)
+
+    initialize_logger()
+
+    parser = argparse.ArgumentParser(description="Run healthcare data analysis or generate GPT insights.")
+    parser.add_argument("--mode", choices=["analyze", "insights"], required=True,
+                        help="Mode to run: 'analyze' for data analysis, 'insights' for GPT insights.")
+    args = parser.parse_args()
+
+    if args.mode == "analyze":
+        main()
+    elif args.mode == "insights":
+        generate_gpt_insights()
