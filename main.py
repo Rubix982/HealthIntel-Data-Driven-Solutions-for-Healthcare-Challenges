@@ -6,6 +6,7 @@ from logging import Logger
 
 import folium
 import math
+import numpy as np
 import pandas
 import plotly.express as px
 import plotly.graph_objects as go
@@ -14,12 +15,13 @@ import statsmodels.api as sm
 import torch
 import torch.nn as nn
 from geopy.geocoders import Nominatim
+from lifelines import KaplanMeierFitter
 from pandas import Series
 from scipy import stats
 from scipy.stats import chi2_contingency
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import (
     confusion_matrix,
@@ -27,7 +29,7 @@ from sklearn.metrics import (
     classification_report,
     ConfusionMatrixDisplay,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from statsmodels.formula.api import ols
 from wordcloud import WordCloud
@@ -105,6 +107,111 @@ def save_plot(figure, filename: str):
 def save_plot_html(figure, filename: str):
     figure.write_html(get_plot_filepath(filename))
     plt.close(fig=figure)
+
+
+# Enhanced Data Cleaning Function
+def clean_data(dataframe: pandas.DataFrame) -> pandas.DataFrame:
+    # Handling missing values
+    dataframe.fillna({
+        Columns.AGE: dataframe[Columns.AGE].median(),
+        Columns.LENGTH_OF_STAY: dataframe[Columns.LENGTH_OF_STAY].median()
+    }, inplace=True)
+
+    # Remove outliers based on Z-scores
+    z_scores = np.abs(stats.zscore(dataframe[Columns.LENGTH_OF_STAY]))
+    dataframe = dataframe[(z_scores < 3)]
+
+    return dataframe
+
+
+# Enhanced Correlation Heatmap
+def enhanced_correlation_heatmap(dataframe: pandas.DataFrame):
+    plt.figure(figsize=(12, 10))
+    # Select only numeric columns
+    numeric_dataframe = dataframe.select_dtypes(include=['number'])
+
+    # Compute the correlation matrix for numeric columns only
+    correlation_matrix = numeric_dataframe.corr()
+    sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f")
+    plt.title("Enhanced Correlation Heatmap")
+    save_plot(plt.gcf(), "enhanced_correlation_heatmap")
+
+
+# Enhanced Predictive Modeling with Hyperparameter Tuning
+def enhanced_los_prediction(dataframe: pandas.DataFrame):
+    label_encoder = LabelEncoder()
+    dataframe[Columns.GENDER] = label_encoder.fit_transform(dataframe[Columns.GENDER])
+    dataframe[Columns.DISEASE_DIAGNOSED] = label_encoder.fit_transform(dataframe[Columns.DISEASE_DIAGNOSED])
+    dataframe[Columns.HOSPITAL] = label_encoder.fit_transform(dataframe[Columns.HOSPITAL])
+
+    x = dataframe[[Columns.AGE, Columns.GENDER, Columns.DISEASE_DIAGNOSED, Columns.HOSPITAL]]
+    y = dataframe[Columns.LENGTH_OF_STAY]
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+    scaler = StandardScaler()
+    x_train_scaled = scaler.fit_transform(x_train)
+    x_test_scaled = scaler.transform(x_test)
+
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [3, 5, 7],
+        'learning_rate': [0.01, 0.1, 0.2]
+    }
+
+    model = GradientBoostingRegressor()
+    grid_search = GridSearchCV(model, param_grid, scoring='neg_mean_absolute_error', cv=3)
+    grid_search.fit(x_train_scaled, y_train)
+
+    best_model = grid_search.best_estimator_
+    y_pred = best_model.predict(x_test_scaled)
+
+    mae = mean_absolute_error(y_test, y_pred)
+    log_time_info(f"Enhanced Gradient Boosting Regression MAE: {mae:.4f}")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(y_test.values, label="Actual LoS", color="blue")
+    plt.plot(y_pred, label="Predicted LoS", color="orange", linestyle="--")
+    plt.legend()
+    plt.title("Enhanced Actual vs Predicted LoS")
+    save_plot(plt.gcf(), "enhanced_actual_vs_predicted_los")
+
+
+# Enhanced Geographic Heatmap
+def geographic_heatmap(dataframe: pandas.DataFrame):
+    geolocator = Nominatim(user_agent="geoapi")
+    city_coordinates = {}
+    for city in dataframe[Columns.CITY].unique():
+        location = geolocator.geocode(city)
+        if location:
+            city_coordinates[city] = (location.latitude, location.longitude)
+
+    m = folium.Map(location=[20, 78], zoom_start=5)
+
+    for city, coordinates in city_coordinates.items():
+        count = dataframe[dataframe[Columns.CITY] == city][Columns.PATIENT_ID].count()
+        folium.CircleMarker(
+            location=coordinates,
+            radius=count / 10,
+            popup=f"{city}: {count} patients",
+            color="blue",
+            fill=True,
+            fill_color="blue"
+        ).add_to(m)
+
+    m.save(os.path.join(Constants.Paths.PLOT_OUTPUT_DIR, "geographic_heatmap.html"))
+
+
+# Survival Analysis (Kaplan-Meier)
+def survival_analysis(dataframe: pandas.DataFrame):
+    kmf = KaplanMeierFitter()
+    survival_times = dataframe[Columns.LENGTH_OF_STAY]
+    kmf.fit(durations=survival_times, event_observed=(survival_times > 0))
+
+    plt.figure(figsize=(10, 6))
+    kmf.plot_survival_function()
+    plt.title("Survival Analysis: Length of Stay")
+    save_plot(plt.gcf(), "survival_analysis")
 
 
 def analyze_column_statistics(
@@ -1109,6 +1216,13 @@ def main():
     quick_mean_absolute_error_with_ridge_analysis(dataframe=dataframe)
     quick_pca_analysis(dataframe=dataframe)
 
+    # Some advanced analysis
+    dataframe = clean_data(dataframe)
+    enhanced_correlation_heatmap(dataframe)
+    enhanced_los_prediction(dataframe)
+    # geographic_heatmap(dataframe)
+    survival_analysis(dataframe)
+
 
 def initialize():
     initialize_logger()
@@ -1163,7 +1277,7 @@ def initialize_logger():
         console_handler.setLevel(logging.DEBUG)
 
         # Create a log formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
         # Add the formatter to both handlers
         file_handler.setFormatter(formatter)
